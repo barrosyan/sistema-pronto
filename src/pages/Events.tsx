@@ -412,9 +412,326 @@ const Events = () => {
         </TabsContent>
 
         <TabsContent value="comparison" className="space-y-6 mt-6">
-          <p className="text-center text-muted-foreground py-8">
-            Funcionalidade de comparação avançada em desenvolvimento
-          </p>
+          {/* Campaign Selection */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Selecionar Campanhas para Comparação</CardTitle>
+              <CardDescription>
+                Compare até 4 campanhas simultaneamente em gráficos sincronizados
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {selectedCampaigns.map((campaignName, index) => (
+                  <div key={index} className="flex items-center gap-2">
+                    <Select
+                      value={campaignName}
+                      onValueChange={(value) => handleCampaignSelect(index, value)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione uma campanha" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {availableCampaigns.map((name) => (
+                          <SelectItem key={name} value={name}>
+                            {name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {selectedCampaigns.length > 1 && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => removeCampaign(index)}
+                      >
+                        ×
+                      </Button>
+                    )}
+                  </div>
+                ))}
+              </div>
+              
+              {selectedCampaigns.length < 4 && availableCampaigns.length > selectedCampaigns.length && (
+                <Button onClick={addCampaign} variant="outline" className="w-full">
+                  + Adicionar Campanha para Comparar
+                </Button>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Comparison Overview Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {selectedCampaigns.map((campaignName) => {
+              const campaign = campaignsList.find((c) => c.name === campaignName);
+              if (!campaign) return null;
+
+              return (
+                <Card key={campaignName}>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm font-medium truncate" title={campaign.name}>
+                      {campaign.name}
+                    </CardTitle>
+                    <CardDescription className="text-xs truncate">
+                      {campaign.profile}
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Convites:</span>
+                      <span className="font-semibold">{campaign.invitations}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Conexões:</span>
+                      <span className="font-semibold">{campaign.connections}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Mensagens:</span>
+                      <span className="font-semibold">{campaign.messages}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Positivos:</span>
+                      <span className="font-semibold text-success">{campaign.positiveLeads}</span>
+                    </div>
+                    <div className="flex justify-between text-sm border-t pt-2">
+                      <span className="text-muted-foreground">Taxa Aceite:</span>
+                      <span className="font-semibold">{campaign.acceptanceRate.toFixed(1)}%</span>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+
+          {/* Comparison Charts */}
+          {selectedCampaigns.length >= 2 && (
+            <>
+              {/* Metrics Comparison Bar Chart */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Comparação de Métricas</CardTitle>
+                  <CardDescription>
+                    Comparação visual das principais métricas entre campanhas selecionadas
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <ChartContainer
+                    config={{
+                      invitations: { label: 'Convites', color: 'hsl(var(--chart-1))' },
+                      connections: { label: 'Conexões', color: 'hsl(var(--chart-2))' },
+                      messages: { label: 'Mensagens', color: 'hsl(var(--chart-3))' },
+                      positiveLeads: { label: 'Positivos', color: 'hsl(var(--chart-4))' },
+                    }}
+                    className="h-80"
+                  >
+                    <BarChart
+                      data={selectedCampaigns.map((name) => {
+                        const c = campaignsList.find((campaign) => campaign.name === name);
+                        return {
+                          name: name.substring(0, 20) + (name.length > 20 ? '...' : ''),
+                          invitations: c?.invitations || 0,
+                          connections: c?.connections || 0,
+                          messages: c?.messages || 0,
+                          positiveLeads: c?.positiveLeads || 0,
+                        };
+                      })}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="name" angle={-45} textAnchor="end" height={100} />
+                      <YAxis />
+                      <ChartTooltip content={<ChartTooltipContent />} />
+                      <Bar dataKey="invitations" fill="hsl(var(--chart-1))" />
+                      <Bar dataKey="connections" fill="hsl(var(--chart-2))" />
+                      <Bar dataKey="messages" fill="hsl(var(--chart-3))" />
+                      <Bar dataKey="positiveLeads" fill="hsl(var(--chart-4))" />
+                    </BarChart>
+                  </ChartContainer>
+                </CardContent>
+              </Card>
+
+              {/* Acceptance Rate Comparison */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Taxa de Aceite de Conexão</CardTitle>
+                  <CardDescription>
+                    Comparação da efetividade na conversão de convites em conexões
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <ChartContainer
+                    config={{
+                      acceptanceRate: { label: 'Taxa de Aceite (%)', color: 'hsl(var(--chart-5))' },
+                    }}
+                    className="h-64"
+                  >
+                    <BarChart
+                      data={selectedCampaigns.map((name) => {
+                        const c = campaignsList.find((campaign) => campaign.name === name);
+                        return {
+                          name: name.substring(0, 20) + (name.length > 20 ? '...' : ''),
+                          acceptanceRate: c?.acceptanceRate || 0,
+                        };
+                      })}
+                      layout="horizontal"
+                    >
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis type="number" domain={[0, 100]} />
+                      <YAxis dataKey="name" type="category" width={150} />
+                      <ChartTooltip content={<ChartTooltipContent />} />
+                      <Bar dataKey="acceptanceRate" fill="hsl(var(--chart-5))" />
+                    </BarChart>
+                  </ChartContainer>
+                </CardContent>
+              </Card>
+
+              {/* Performance Summary Table */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Resumo de Performance</CardTitle>
+                  <CardDescription>
+                    Análise detalhada do desempenho de cada campanha
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Campanha</TableHead>
+                        <TableHead className="text-right">Convites</TableHead>
+                        <TableHead className="text-right">Conexões</TableHead>
+                        <TableHead className="text-right">Mensagens</TableHead>
+                        <TableHead className="text-right">Positivos</TableHead>
+                        <TableHead className="text-right">Taxa Aceite</TableHead>
+                        <TableHead className="text-right">Conv. Rate</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {selectedCampaigns.map((name) => {
+                        const c = campaignsList.find((campaign) => campaign.name === name);
+                        if (!c) return null;
+                        
+                        const conversionRate = c.invitations > 0 
+                          ? ((c.positiveLeads / c.invitations) * 100).toFixed(2)
+                          : '0.00';
+
+                        return (
+                          <TableRow key={name}>
+                            <TableCell className="font-medium">
+                              <div className="max-w-[200px] truncate" title={c.name}>
+                                {c.name}
+                              </div>
+                              <div className="text-xs text-muted-foreground truncate">
+                                {c.profile}
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-right">{c.invitations}</TableCell>
+                            <TableCell className="text-right">{c.connections}</TableCell>
+                            <TableCell className="text-right">{c.messages}</TableCell>
+                            <TableCell className="text-right">
+                              <Badge variant="outline" className="bg-success/10">
+                                {c.positiveLeads}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-right">
+                              {c.acceptanceRate.toFixed(1)}%
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <Badge variant="secondary">
+                                {conversionRate}%
+                              </Badge>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+
+              {/* Best Performers */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Melhores Performances</CardTitle>
+                  <CardDescription>
+                    Identificação das campanhas com melhor desempenho por categoria
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {(() => {
+                      const campaigns = selectedCampaigns
+                        .map(name => campaignsList.find(c => c.name === name))
+                        .filter(Boolean);
+                      
+                      const bestAcceptance = campaigns.reduce((max, c) => 
+                        c!.acceptanceRate > (max?.acceptanceRate || 0) ? c : max
+                      );
+                      
+                      const bestPositives = campaigns.reduce((max, c) => 
+                        c!.positiveLeads > (max?.positiveLeads || 0) ? c : max
+                      );
+                      
+                      const bestConversion = campaigns.reduce((max, c) => {
+                        const rate = c!.invitations > 0 ? (c!.positiveLeads / c!.invitations) : 0;
+                        const maxRate = max && max.invitations > 0 ? (max.positiveLeads / max.invitations) : 0;
+                        return rate > maxRate ? c : max;
+                      });
+
+                      return (
+                        <>
+                          <div className="flex items-start gap-3 p-3 bg-muted/50 rounded-lg">
+                            <TrendingUp className="h-5 w-5 text-success mt-0.5" />
+                            <div className="flex-1">
+                              <div className="font-semibold text-sm">Melhor Taxa de Aceite</div>
+                              <div className="text-sm text-muted-foreground">{bestAcceptance?.name}</div>
+                              <div className="text-lg font-bold text-success mt-1">
+                                {bestAcceptance?.acceptanceRate.toFixed(1)}%
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="flex items-start gap-3 p-3 bg-muted/50 rounded-lg">
+                            <ArrowUpRight className="h-5 w-5 text-primary mt-0.5" />
+                            <div className="flex-1">
+                              <div className="font-semibold text-sm">Mais Respostas Positivas</div>
+                              <div className="text-sm text-muted-foreground">{bestPositives?.name}</div>
+                              <div className="text-lg font-bold text-primary mt-1">
+                                {bestPositives?.positiveLeads} leads
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="flex items-start gap-3 p-3 bg-muted/50 rounded-lg">
+                            <TrendingUp className="h-5 w-5 text-chart-4 mt-0.5" />
+                            <div className="flex-1">
+                              <div className="font-semibold text-sm">Melhor Taxa de Conversão</div>
+                              <div className="text-sm text-muted-foreground">{bestConversion?.name}</div>
+                              <div className="text-lg font-bold mt-1">
+                                {bestConversion && bestConversion.invitations > 0
+                                  ? ((bestConversion.positiveLeads / bestConversion.invitations) * 100).toFixed(2)
+                                  : '0.00'}%
+                              </div>
+                            </div>
+                          </div>
+                        </>
+                      );
+                    })()}
+                  </div>
+                </CardContent>
+              </Card>
+            </>
+          )}
+
+          {selectedCampaigns.length < 2 && (
+            <Card>
+              <CardContent className="py-12">
+                <div className="text-center text-muted-foreground">
+                  <GitCompare className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                  <p>Selecione pelo menos 2 campanhas para visualizar a comparação</p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
       </Tabs>
     </div>
