@@ -11,7 +11,7 @@ import { supabase } from '@/integrations/supabase/client';
 
 const Campaigns = () => {
   const navigate = useNavigate();
-  const { campaignMetrics, setCampaignMetrics, setPositiveLeads, setNegativeLeads, loadFromDatabase } = useCampaignData();
+  const { campaignMetrics, addCampaignMetrics, addPositiveLeads, addNegativeLeads, setCampaignMetrics, setPositiveLeads, setNegativeLeads, loadFromDatabase } = useCampaignData();
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
@@ -211,11 +211,11 @@ const Campaigns = () => {
 
     try {
       const data = await parseExcelSheets(files[0]);
-      await setCampaignMetrics(data.campaignMetrics);
-      await setPositiveLeads(data.positiveLeads);
-      await setNegativeLeads(data.negativeLeads);
+      await addCampaignMetrics(data.campaignMetrics);
+      await addPositiveLeads(data.positiveLeads);
+      await addNegativeLeads(data.negativeLeads);
       
-      toast.success(`Dados importados e salvos! ${data.campaignMetrics.length} métricas, ${data.positiveLeads.length} leads positivos, ${data.negativeLeads.length} leads negativos`);
+      toast.success(`Dados adicionados com sucesso! ${data.campaignMetrics.length} métricas, ${data.positiveLeads.length} leads positivos, ${data.negativeLeads.length} leads negativos`);
     } catch (error) {
       console.error('Error processing file:', error);
       toast.error('Erro ao processar arquivo');

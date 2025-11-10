@@ -13,6 +13,9 @@ interface CampaignDataStore {
   setCampaignMetrics: (metrics: CampaignMetrics[]) => Promise<void>;
   setPositiveLeads: (leads: Lead[]) => Promise<void>;
   setNegativeLeads: (leads: Lead[]) => Promise<void>;
+  addCampaignMetrics: (metrics: CampaignMetrics[]) => Promise<void>;
+  addPositiveLeads: (leads: Lead[]) => Promise<void>;
+  addNegativeLeads: (leads: Lead[]) => Promise<void>;
   addPositiveLead: (lead: Lead) => Promise<void>;
   addNegativeLead: (lead: Lead) => Promise<void>;
   updateLead: (id: string, updates: Partial<Lead>) => Promise<void>;
@@ -108,109 +111,307 @@ export const useCampaignData = create<CampaignDataStore>((set, get) => ({
     set({ campaignMetrics: metrics });
     
     try {
-      // Delete existing metrics
-      await supabase.from('campaign_metrics').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-      
-      // Insert new metrics
-      const dbMetrics = metrics.map(m => ({
+      const metricsToInsert = metrics.map(m => ({
         campaign_name: m.campaignName,
         event_type: m.eventType,
         profile_name: m.profileName,
         total_count: m.totalCount,
         daily_data: m.dailyData
       }));
-      
-      const { error } = await supabase.from('campaign_metrics').insert(dbMetrics);
+
+      const { error } = await supabase
+        .from('campaign_metrics')
+        .delete()
+        .neq('id', '00000000-0000-0000-0000-000000000000');
+
       if (error) throw error;
+
+      const { error: insertError } = await supabase
+        .from('campaign_metrics')
+        .insert(metricsToInsert);
+
+      if (insertError) throw insertError;
     } catch (error) {
-      console.error('Error saving campaign metrics:', error);
-      toast.error('Erro ao salvar métricas no banco');
+      console.error('Error saving campaign metrics to database:', error);
     }
   },
-  
+
+  addCampaignMetrics: async (newMetrics) => {
+    const existingMetrics = get().campaignMetrics;
+    
+    // Merge logic: update existing or add new
+    const metricsMap = new Map(
+      existingMetrics.map(m => [
+        `${m.campaignName}|${m.eventType}|${m.profileName}`,
+        m
+      ])
+    );
+
+    newMetrics.forEach(newMetric => {
+      const key = `${newMetric.campaignName}|${newMetric.eventType}|${newMetric.profileName}`;
+      const existing = metricsMap.get(key);
+      
+      if (existing) {
+        // Merge daily data
+        const mergedDailyData = { ...existing.dailyData, ...newMetric.dailyData };
+        metricsMap.set(key, {
+          ...newMetric,
+          dailyData: mergedDailyData,
+          totalCount: Object.values(mergedDailyData).reduce((sum: number, val) => sum + (val as number), 0)
+        });
+      } else {
+        metricsMap.set(key, newMetric);
+      }
+    });
+
+    const mergedMetrics = Array.from(metricsMap.values());
+    set({ campaignMetrics: mergedMetrics });
+
+    try {
+      const metricsToUpsert = mergedMetrics.map(m => ({
+        campaign_name: m.campaignName,
+        event_type: m.eventType,
+        profile_name: m.profileName,
+        total_count: m.totalCount,
+        daily_data: m.dailyData
+      }));
+
+      const { error } = await supabase
+        .from('campaign_metrics')
+        .upsert(metricsToUpsert, { 
+          onConflict: 'campaign_name,event_type,profile_name',
+          ignoreDuplicates: false 
+        });
+
+      if (error) throw error;
+    } catch (error) {
+      console.error('Error adding campaign metrics to database:', error);
+    }
+  },
+
   setPositiveLeads: async (leads) => {
     set({ positiveLeads: leads });
     
     try {
-      // Delete existing positive leads
-      await supabase.from('leads').delete().eq('status', 'positive');
-      
-      // Insert new leads
-      if (leads.length > 0) {
-        const dbLeads = leads.map(l => ({
-          campaign: l.campaign,
-          linkedin: l.linkedin,
-          name: l.name,
-          position: l.position,
-          company: l.company,
-          status: l.status,
-          positive_response_date: l.positiveResponseDate,
-          transfer_date: l.transferDate,
-          status_details: l.statusDetails,
-          comments: l.comments,
-          follow_up_1_date: l.followUp1Date,
-          follow_up_1_comments: l.followUp1Comments,
-          follow_up_2_date: l.followUp2Date,
-          follow_up_2_comments: l.followUp2Comments,
-          follow_up_3_date: l.followUp3Date,
-          follow_up_3_comments: l.followUp3Comments,
-          follow_up_4_date: l.followUp4Date,
-          follow_up_4_comments: l.followUp4Comments,
-          observations: l.observations,
-          meeting_schedule_date: l.meetingScheduleDate,
-          meeting_date: l.meetingDate,
-          proposal_date: l.proposalDate,
-          proposal_value: l.proposalValue,
-          sale_date: l.saleDate,
-          sale_value: l.saleValue,
-          profile: l.profile,
-          classification: l.classification,
-          attended_webinar: l.attendedWebinar,
-          whatsapp: l.whatsapp,
-          stand_day: l.standDay,
-          pavilion: l.pavilion,
-          stand: l.stand
-        }));
-        
-        const { error } = await supabase.from('leads').insert(dbLeads);
-        if (error) throw error;
-      }
+      const { error: deleteError } = await supabase
+        .from('leads')
+        .delete()
+        .eq('status', 'positive');
+
+      if (deleteError) throw deleteError;
+
+      const leadsToInsert = leads.map(l => ({
+        campaign: l.campaign,
+        linkedin: l.linkedin,
+        name: l.name,
+        position: l.position,
+        company: l.company,
+        status: 'positive',
+        positive_response_date: l.positiveResponseDate,
+        transfer_date: l.transferDate,
+        status_details: l.statusDetails,
+        comments: l.comments,
+        follow_up_1_date: l.followUp1Date,
+        follow_up_1_comments: l.followUp1Comments,
+        follow_up_2_date: l.followUp2Date,
+        follow_up_2_comments: l.followUp2Comments,
+        follow_up_3_date: l.followUp3Date,
+        follow_up_3_comments: l.followUp3Comments,
+        follow_up_4_date: l.followUp4Date,
+        follow_up_4_comments: l.followUp4Comments,
+        observations: l.observations,
+        meeting_schedule_date: l.meetingScheduleDate,
+        meeting_date: l.meetingDate,
+        proposal_date: l.proposalDate,
+        proposal_value: l.proposalValue,
+        sale_date: l.saleDate,
+        sale_value: l.saleValue,
+        profile: l.profile,
+        classification: l.classification,
+        attended_webinar: l.attendedWebinar,
+        whatsapp: l.whatsapp,
+        stand_day: l.standDay,
+        pavilion: l.pavilion,
+        stand: l.stand,
+        negative_response_date: l.negativeResponseDate,
+        had_follow_up: l.hadFollowUp,
+        follow_up_reason: l.followUpReason,
+      }));
+
+      const { error: insertError } = await supabase
+        .from('leads')
+        .insert(leadsToInsert);
+
+      if (insertError) throw insertError;
     } catch (error) {
-      console.error('Error saving positive leads:', error);
-      toast.error('Erro ao salvar leads positivos no banco');
+      console.error('Error saving positive leads to database:', error);
     }
   },
-  
+
+  addPositiveLeads: async (newLeads) => {
+    const existingLeads = get().positiveLeads;
+    const mergedLeads = [...existingLeads, ...newLeads];
+    set({ positiveLeads: mergedLeads });
+
+    try {
+      const leadsToInsert = newLeads.map(l => ({
+        campaign: l.campaign,
+        linkedin: l.linkedin,
+        name: l.name,
+        position: l.position,
+        company: l.company,
+        status: 'positive',
+        positive_response_date: l.positiveResponseDate,
+        transfer_date: l.transferDate,
+        status_details: l.statusDetails,
+        comments: l.comments,
+        follow_up_1_date: l.followUp1Date,
+        follow_up_1_comments: l.followUp1Comments,
+        follow_up_2_date: l.followUp2Date,
+        follow_up_2_comments: l.followUp2Comments,
+        follow_up_3_date: l.followUp3Date,
+        follow_up_3_comments: l.followUp3Comments,
+        follow_up_4_date: l.followUp4Date,
+        follow_up_4_comments: l.followUp4Comments,
+        observations: l.observations,
+        meeting_schedule_date: l.meetingScheduleDate,
+        meeting_date: l.meetingDate,
+        proposal_date: l.proposalDate,
+        proposal_value: l.proposalValue,
+        sale_date: l.saleDate,
+        sale_value: l.saleValue,
+        profile: l.profile,
+        classification: l.classification,
+        attended_webinar: l.attendedWebinar,
+        whatsapp: l.whatsapp,
+        stand_day: l.standDay,
+        pavilion: l.pavilion,
+        stand: l.stand,
+        negative_response_date: l.negativeResponseDate,
+        had_follow_up: l.hadFollowUp,
+        follow_up_reason: l.followUpReason,
+      }));
+
+      const { error } = await supabase
+        .from('leads')
+        .insert(leadsToInsert);
+
+      if (error) throw error;
+    } catch (error) {
+      console.error('Error adding positive leads to database:', error);
+    }
+  },
+
   setNegativeLeads: async (leads) => {
     set({ negativeLeads: leads });
     
     try {
-      // Delete existing negative leads
-      await supabase.from('leads').delete().eq('status', 'negative');
-      
-      // Insert new leads
-      if (leads.length > 0) {
-        const dbLeads = leads.map(l => ({
-          campaign: l.campaign,
-          linkedin: l.linkedin,
-          name: l.name,
-          position: l.position,
-          company: l.company,
-          status: l.status,
-          negative_response_date: l.negativeResponseDate,
-          transfer_date: l.transferDate,
-          status_details: l.statusDetails,
-          observations: l.observations,
-          had_follow_up: l.hadFollowUp,
-          follow_up_reason: l.followUpReason
-        }));
-        
-        const { error } = await supabase.from('leads').insert(dbLeads);
-        if (error) throw error;
-      }
+      const { error: deleteError } = await supabase
+        .from('leads')
+        .delete()
+        .eq('status', 'negative');
+
+      if (deleteError) throw deleteError;
+
+      const leadsToInsert = leads.map(l => ({
+        campaign: l.campaign,
+        linkedin: l.linkedin,
+        name: l.name,
+        position: l.position,
+        company: l.company,
+        status: 'negative',
+        positive_response_date: l.positiveResponseDate,
+        transfer_date: l.transferDate,
+        status_details: l.statusDetails,
+        comments: l.comments,
+        follow_up_1_date: l.followUp1Date,
+        follow_up_1_comments: l.followUp1Comments,
+        follow_up_2_date: l.followUp2Date,
+        follow_up_2_comments: l.followUp2Comments,
+        follow_up_3_date: l.followUp3Date,
+        follow_up_3_comments: l.followUp3Comments,
+        follow_up_4_date: l.followUp4Date,
+        follow_up_4_comments: l.followUp4Comments,
+        observations: l.observations,
+        meeting_schedule_date: l.meetingScheduleDate,
+        meeting_date: l.meetingDate,
+        proposal_date: l.proposalDate,
+        proposal_value: l.proposalValue,
+        sale_date: l.saleDate,
+        sale_value: l.saleValue,
+        profile: l.profile,
+        classification: l.classification,
+        attended_webinar: l.attendedWebinar,
+        whatsapp: l.whatsapp,
+        stand_day: l.standDay,
+        pavilion: l.pavilion,
+        stand: l.stand,
+        negative_response_date: l.negativeResponseDate,
+        had_follow_up: l.hadFollowUp,
+        follow_up_reason: l.followUpReason,
+      }));
+
+      const { error: insertError } = await supabase
+        .from('leads')
+        .insert(leadsToInsert);
+
+      if (insertError) throw insertError;
     } catch (error) {
-      console.error('Error saving negative leads:', error);
-      toast.error('Erro ao salvar leads negativos no banco');
+      console.error('Error saving negative leads to database:', error);
+    }
+  },
+
+  addNegativeLeads: async (newLeads) => {
+    const existingLeads = get().negativeLeads;
+    const mergedLeads = [...existingLeads, ...newLeads];
+    set({ negativeLeads: mergedLeads });
+
+    try {
+      const leadsToInsert = newLeads.map(l => ({
+        campaign: l.campaign,
+        linkedin: l.linkedin,
+        name: l.name,
+        position: l.position,
+        company: l.company,
+        status: 'negative',
+        positive_response_date: l.positiveResponseDate,
+        transfer_date: l.transferDate,
+        status_details: l.statusDetails,
+        comments: l.comments,
+        follow_up_1_date: l.followUp1Date,
+        follow_up_1_comments: l.followUp1Comments,
+        follow_up_2_date: l.followUp2Date,
+        follow_up_2_comments: l.followUp2Comments,
+        follow_up_3_date: l.followUp3Date,
+        follow_up_3_comments: l.followUp3Comments,
+        follow_up_4_date: l.followUp4Date,
+        follow_up_4_comments: l.followUp4Comments,
+        observations: l.observations,
+        meeting_schedule_date: l.meetingScheduleDate,
+        meeting_date: l.meetingDate,
+        proposal_date: l.proposalDate,
+        proposal_value: l.proposalValue,
+        sale_date: l.saleDate,
+        sale_value: l.saleValue,
+        profile: l.profile,
+        classification: l.classification,
+        attended_webinar: l.attendedWebinar,
+        whatsapp: l.whatsapp,
+        stand_day: l.standDay,
+        pavilion: l.pavilion,
+        stand: l.stand,
+        negative_response_date: l.negativeResponseDate,
+        had_follow_up: l.hadFollowUp,
+        follow_up_reason: l.followUpReason,
+      }));
+
+      const { error } = await supabase
+        .from('leads')
+        .insert(leadsToInsert);
+
+      if (error) throw error;
+    } catch (error) {
+      console.error('Error adding negative leads to database:', error);
     }
   },
   
