@@ -21,6 +21,10 @@ export const LeadEditDialog = ({ lead, open, onOpenChange, onSave }: LeadEditDia
   if (!editedLead) return null;
 
   const handleSave = () => {
+    if (!editedLead.name || !editedLead.campaign) {
+      toast.error('Nome e Campanha são obrigatórios');
+      return;
+    }
     onSave(editedLead);
     toast.success('Lead atualizado com sucesso!');
     onOpenChange(false);

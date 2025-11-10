@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Sparkles, Image as ImageIcon, Copy, Download, Loader2 } from 'lucide-react';
+import { Sparkles, Image as ImageIcon, Copy, Download, Loader2, Upload } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useCampaignData } from '@/hooks/useCampaignData';
@@ -208,6 +208,29 @@ const ContentGeneration = () => {
                   <p className="text-xs text-muted-foreground">
                     Adicione links, exemplos ou informações que devem ser consideradas na criação do conteúdo
                   </p>
+                  <input
+                    type="file"
+                    id="reference-files"
+                    multiple
+                    accept=".pdf,.doc,.docx,.txt,.md"
+                    className="hidden"
+                    onChange={(e) => {
+                      const files = e.target.files;
+                      if (files && files.length > 0) {
+                        toast.info(`${files.length} arquivo(s) selecionado(s)`);
+                      }
+                    }}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => document.getElementById('reference-files')?.click()}
+                    className="w-full"
+                  >
+                    <Upload className="mr-2 h-4 w-4" />
+                    Upload de Arquivos de Referência
+                  </Button>
                 </div>
 
                 <Button 

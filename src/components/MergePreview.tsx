@@ -30,9 +30,9 @@ export function MergePreview({ mergedData, originalRowCount }: MergePreviewProps
           Mostrando {previewRows.length} de {mergedData.length} linhas
         </p>
       </CardHeader>
-      <CardContent>
-        <ScrollArea className="w-full">
-          <div className="overflow-x-auto">
+      <CardContent className="p-0">
+        <div className="overflow-x-auto max-w-full">
+          <div className="max-h-[500px] overflow-y-auto">
             <table className="w-full border-collapse text-sm">
               <thead>
                 <tr className="bg-table-header">
@@ -67,7 +67,7 @@ export function MergePreview({ mergedData, originalRowCount }: MergePreviewProps
               </tbody>
             </table>
           </div>
-        </ScrollArea>
+        </div>
       </CardContent>
     </Card>
   );

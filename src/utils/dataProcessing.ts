@@ -63,13 +63,19 @@ export function detectNameColumns(headers: string[]): {
 }
 
 export function detectCompanyColumn(headers: string[]): string | undefined {
-  const lowerHeaders = headers.map(h => h.toLowerCase());
+  const lowerHeaders = headers.map(h => h.toLowerCase().trim());
   
-  const companyIndex = lowerHeaders.findIndex(h => 
-    COMPANY_FIELDS.some(field => h.includes(field))
-  );
+  for (let i = 0; i < lowerHeaders.length; i++) {
+    const header = lowerHeaders[i];
+    if (COMPANY_FIELDS.some(field => {
+      const normalizedField = field.toLowerCase().trim();
+      return header === normalizedField || header.includes(normalizedField);
+    })) {
+      return headers[i];
+    }
+  }
   
-  return companyIndex !== -1 ? headers[companyIndex] : undefined;
+  return undefined;
 }
 
 export function extractMergeKey(

@@ -1,32 +1,55 @@
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { TrendingUp, Users, Mail, Calendar, Activity } from 'lucide-react';
 import { useCampaignData } from '@/hooks/useCampaignData';
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, Line, LineChart, XAxis, YAxis } from 'recharts';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Label } from '@/components/ui/label';
 
 const Analytics = () => {
   const { campaignMetrics, positiveLeads, negativeLeads, loadFromDatabase } = useCampaignData();
+  const [selectedCampaign, setSelectedCampaign] = useState<string>('all');
 
   useEffect(() => {
     loadFromDatabase();
   }, [loadFromDatabase]);
 
+  const availableCampaigns = useMemo(() => {
+    const campaigns = new Set(campaignMetrics.map(m => m.campaignName).filter(Boolean));
+    return Array.from(campaigns);
+  }, [campaignMetrics]);
+
+  const filteredMetrics = useMemo(() => {
+    if (selectedCampaign === 'all') return campaignMetrics;
+    return campaignMetrics.filter(m => m.campaignName === selectedCampaign);
+  }, [campaignMetrics, selectedCampaign]);
+
+  const filteredPositiveLeads = useMemo(() => {
+    if (selectedCampaign === 'all') return positiveLeads;
+    return positiveLeads.filter(l => l.campaign === selectedCampaign);
+  }, [positiveLeads, selectedCampaign]);
+
+  const filteredNegativeLeads = useMemo(() => {
+    if (selectedCampaign === 'all') return negativeLeads;
+    return negativeLeads.filter(l => l.campaign === selectedCampaign);
+  }, [negativeLeads, selectedCampaign]);
+
   const totalMetrics = useMemo(() => {
-    const invitationsSent = campaignMetrics
+    const invitationsSent = filteredMetrics
       .filter(m => m.eventType === 'Connection Requests Sent')
       .reduce((sum, m) => sum + m.totalCount, 0);
 
-    const connectionsAccepted = campaignMetrics
+    const connectionsAccepted = filteredMetrics
       .filter(m => m.eventType === 'Connection Requests Accepted')
       .reduce((sum, m) => sum + m.totalCount, 0);
 
-    const messagesSent = campaignMetrics
+    const messagesSent = filteredMetrics
       .filter(m => m.eventType === 'Messages Sent')
       .reduce((sum, m) => sum + m.totalCount, 0);
 
-    const positiveResponses = positiveLeads.length;
-    const meetings = positiveLeads.filter(l => l.meetingDate).length;
+    const positiveResponses = filteredPositiveLeads.length;
+    const meetings = filteredPositiveLeads.filter(l => l.meetingDate).length;
     const acceptanceRate = invitationsSent > 0 ? ((connectionsAccepted / invitationsSent) * 100).toFixed(1) : '0';
     const conversionRate = messagesSent > 0 ? ((positiveResponses / messagesSent) * 100).toFixed(1) : '0';
     const meetingRate = positiveResponses > 0 ? ((meetings / positiveResponses) * 100).toFixed(1) : '0';
@@ -41,12 +64,12 @@ const Analytics = () => {
       conversionRate,
       meetingRate,
     };
-  }, [campaignMetrics, positiveLeads]);
+  }, [filteredMetrics, filteredPositiveLeads]);
 
   const timelineData = useMemo(() => {
     const dailyData: Record<string, any> = {};
 
-    campaignMetrics.forEach(metric => {
+    filteredMetrics.forEach(metric => {
       Object.entries(metric.dailyData || {}).forEach(([date, count]) => {
         if (!dailyData[date]) {
           dailyData[date] = { date };
@@ -70,7 +93,7 @@ const Analytics = () => {
     });
 
     return Object.values(dailyData).sort((a, b) => a.date.localeCompare(b.date));
-  }, [campaignMetrics]);
+  }, [filteredMetrics]);
 
   const funnelData = useMemo(() => [
     { label: 'Convites Enviados', value: totalMetrics.invitationsSent, width: '100%' },
@@ -78,9 +101,9 @@ const Analytics = () => {
     { label: 'Mensagens Enviadas', value: totalMetrics.messagesSent, width: `${totalMetrics.invitationsSent > 0 ? (totalMetrics.messagesSent / totalMetrics.invitationsSent) * 100 : 0}%` },
     { label: 'Respostas Positivas', value: totalMetrics.positiveResponses, width: `${totalMetrics.invitationsSent > 0 ? (totalMetrics.positiveResponses / totalMetrics.invitationsSent) * 100 : 0}%` },
     { label: 'Reuniões Marcadas', value: totalMetrics.meetings, width: `${totalMetrics.invitationsSent > 0 ? (totalMetrics.meetings / totalMetrics.invitationsSent) * 100 : 0}%` },
-    { label: 'Propostas', value: positiveLeads.filter(l => l.proposalDate).length, width: `${totalMetrics.invitationsSent > 0 ? (positiveLeads.filter(l => l.proposalDate).length / totalMetrics.invitationsSent) * 100 : 0}%` },
-    { label: 'Vendas', value: positiveLeads.filter(l => l.saleDate).length, width: `${totalMetrics.invitationsSent > 0 ? (positiveLeads.filter(l => l.saleDate).length / totalMetrics.invitationsSent) * 100 : 0}%` },
-  ], [totalMetrics, positiveLeads]);
+    { label: 'Propostas', value: filteredPositiveLeads.filter(l => l.proposalDate).length, width: `${totalMetrics.invitationsSent > 0 ? (filteredPositiveLeads.filter(l => l.proposalDate).length / totalMetrics.invitationsSent) * 100 : 0}%` },
+    { label: 'Vendas', value: filteredPositiveLeads.filter(l => l.saleDate).length, width: `${totalMetrics.invitationsSent > 0 ? (filteredPositiveLeads.filter(l => l.saleDate).length / totalMetrics.invitationsSent) * 100 : 0}%` },
+  ], [totalMetrics, filteredPositiveLeads]);
 
   return (
     <div className="space-y-6">
@@ -90,6 +113,30 @@ const Analytics = () => {
           Visualize métricas e análises comparativas de campanhas
         </p>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Filtrar por Campanha</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-2">
+            <Label htmlFor="campaign-filter">Campanha</Label>
+            <Select value={selectedCampaign} onValueChange={setSelectedCampaign}>
+              <SelectTrigger id="campaign-filter" className="w-full max-w-md">
+                <SelectValue placeholder="Selecione uma campanha" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas as Campanhas</SelectItem>
+                {availableCampaigns.map(campaign => (
+                  <SelectItem key={campaign} value={campaign}>
+                    {campaign}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Key Metrics */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">

@@ -9,12 +9,14 @@ import { parseExcelSheets } from '@/utils/excelSheetParser';
 import { useCampaignData } from '@/hooks/useCampaignData';
 import { groupMetricsByCampaign } from '@/utils/campaignParser';
 import { supabase } from '@/integrations/supabase/client';
+import { CampaignDialog } from '@/components/CampaignDialog';
 
 const Campaigns = () => {
   const navigate = useNavigate();
   const { campaignMetrics, addCampaignMetrics, addPositiveLeads, addNegativeLeads, setCampaignMetrics, setPositiveLeads, setNegativeLeads, loadFromDatabase } = useCampaignData();
   const [isLoading, setIsLoading] = useState(false);
   const [inputData, setInputData] = useState('');
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
 
   useEffect(() => {
     loadFromDatabase();
@@ -226,6 +228,11 @@ const Campaigns = () => {
     }
   };
 
+  const handleCreateCampaign = async (data: any) => {
+    toast.success(`Campanha "${data.name}" criada com sucesso!`);
+    setIsDialogOpen(false);
+  };
+
   const groupedCampaigns = groupMetricsByCampaign(campaignMetrics);
   const campaignsList = Array.from(groupedCampaigns.entries()).map(([name, metrics]) => {
     const invitations = metrics.find(m => m.eventType === 'Connection Requests Sent')?.totalCount || 0;
@@ -270,7 +277,7 @@ const Campaigns = () => {
             onChange={handleFileUpload}
           />
           
-          <Button>
+          <Button onClick={() => setIsDialogOpen(true)}>
             <Plus className="mr-2 h-4 w-4" />
             Nova Campanha
           </Button>
@@ -368,6 +375,12 @@ const Campaigns = () => {
           ))}
         </div>
       )}
+
+      <CampaignDialog
+        open={isDialogOpen}
+        onOpenChange={setIsDialogOpen}
+        onSave={handleCreateCampaign}
+      />
     </div>
   );
 };
