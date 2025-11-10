@@ -55,15 +55,15 @@ export const CampaignComparison = ({ campaign1, campaign2 }: CampaignComparisonP
       <CardContent>
         <div className="space-y-6">
           {/* Campaign Headers */}
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-[200px_1fr_1fr] gap-4">
             <div className="text-sm font-medium text-muted-foreground">Métrica</div>
             <div className="text-center">
-              <div className="font-semibold text-sm">{campaign1.name}</div>
-              <div className="text-xs text-muted-foreground">{campaign1.profile}</div>
+              <div className="font-semibold text-sm break-words">{campaign1.name}</div>
+              <div className="text-xs text-muted-foreground truncate">{campaign1.profile}</div>
             </div>
             <div className="text-center">
-              <div className="font-semibold text-sm">{campaign2.name}</div>
-              <div className="text-xs text-muted-foreground">{campaign2.profile}</div>
+              <div className="font-semibold text-sm break-words">{campaign2.name}</div>
+              <div className="text-xs text-muted-foreground truncate">{campaign2.profile}</div>
             </div>
           </div>
 
@@ -74,18 +74,20 @@ export const CampaignComparison = ({ campaign1, campaign2 }: CampaignComparisonP
             const diff = getPercentageDiff(val1, val2);
 
             return (
-              <div key={metric.key} className="grid grid-cols-3 gap-4 items-center py-2 border-b border-border last:border-0">
+              <div key={metric.key} className="grid grid-cols-[200px_1fr_1fr] gap-4 items-center py-2 border-b border-border last:border-0">
                 <div className="text-sm font-medium">{metric.label}</div>
                 <div className="text-center">
                   <div className="flex items-center justify-center gap-2">
-                    <span className="font-semibold">{val1}</span>
+                    <span className="font-semibold">{metric.key === 'acceptanceRate' ? val1.toFixed(1) : val1}</span>
                     {getComparisonIcon(val1, val2)}
                   </div>
                 </div>
                 <div className="text-center">
-                  <div className="flex items-center justify-center gap-2">
-                    <span className="font-semibold">{val2}</span>
-                    <Badge variant="outline" className="text-xs">
+                  <div className="flex flex-col items-center gap-1">
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold">{metric.key === 'acceptanceRate' ? val2.toFixed(1) : val2}</span>
+                    </div>
+                    <Badge variant="outline" className="text-xs whitespace-nowrap">
                       {diff}
                     </Badge>
                   </div>
