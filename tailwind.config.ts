@@ -57,6 +57,13 @@ export default {
           border: "hsl(var(--sidebar-border))",
           ring: "hsl(var(--sidebar-ring))",
         },
+        success: {
+          DEFAULT: "hsl(var(--success))",
+          foreground: "hsl(var(--success-foreground))",
+        },
+        "table-header": "hsl(var(--table-header))",
+        "table-row-even": "hsl(var(--table-row-even))",
+        "table-row-odd": "hsl(var(--table-row-odd))",
       },
       borderRadius: {
         lg: "var(--radius)",
