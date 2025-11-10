@@ -10,6 +10,7 @@ import Events from "./pages/Events";
 import Leads from "./pages/Leads";
 import Analytics from "./pages/Analytics";
 import Merge from "./pages/Merge";
+import ContentGeneration from "./pages/ContentGeneration";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -28,6 +29,7 @@ const App = () => (
             <Route path="/leads" element={<Leads />} />
             <Route path="/analytics" element={<Analytics />} />
             <Route path="/merge" element={<Merge />} />
+            <Route path="/content-generation" element={<ContentGeneration />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </Layout>
