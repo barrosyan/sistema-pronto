@@ -145,21 +145,41 @@ const Analytics = () => {
           <CardDescription>Acompanhe a jornada dos leads desde o primeiro contato até a venda</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="space-y-4">
-            {funnelData.map((stage, index) => (
-              <div key={index}>
-                <div className="flex justify-between mb-1">
-                  <span className="text-sm font-medium">{stage.label}</span>
-                  <span className="text-sm text-muted-foreground">{stage.value}</span>
-                </div>
-                <div className="w-full bg-muted rounded-full h-2.5">
+          <div className="space-y-3">
+            {funnelData.map((stage, index) => {
+              const percentage = totalMetrics.invitationsSent > 0 
+                ? (stage.value / totalMetrics.invitationsSent) * 100 
+                : 0;
+              
+              return (
+                <div key={index} className="relative">
+                  <div className="flex justify-between mb-1.5">
+                    <span className="text-sm font-medium">{stage.label}</span>
+                    <span className="text-sm text-muted-foreground">
+                      {stage.value} ({percentage.toFixed(1)}%)
+                    </span>
+                  </div>
                   <div 
-                    className="bg-primary h-2.5 rounded-full transition-all" 
-                    style={{ width: stage.width }}
-                  />
+                    className="relative h-12 bg-muted/30 rounded-lg overflow-hidden"
+                    style={{ 
+                      width: `${100 - (index * 8)}%`,
+                      margin: '0 auto'
+                    }}
+                  >
+                    <div 
+                      className="h-full bg-gradient-to-r from-primary to-primary/80 rounded-lg flex items-center justify-center transition-all duration-500"
+                      style={{ width: stage.width }}
+                    >
+                      {percentage > 5 && (
+                        <span className="text-xs font-semibold text-primary-foreground">
+                          {stage.value}
+                        </span>
+                      )}
+                    </div>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </CardContent>
       </Card>

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Upload, Search, Filter, Users } from 'lucide-react';
+import { Upload, Search, Filter, Users, Edit } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import {
@@ -16,12 +16,15 @@ import {
 import { Lead } from '@/types/campaign';
 import { useCampaignData } from '@/hooks/useCampaignData';
 import { parseExcelSheets } from '@/utils/excelSheetParser';
+import { LeadEditDialog } from '@/components/LeadEditDialog';
 
 const Leads = () => {
-  const { positiveLeads, negativeLeads, setPositiveLeads, setNegativeLeads } = useCampaignData();
+  const { positiveLeads, negativeLeads, setPositiveLeads, setNegativeLeads, updateLead } = useCampaignData();
   const allLeads = [...positiveLeads, ...negativeLeads];
   const [searchTerm, setSearchTerm] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [editingLead, setEditingLead] = useState<Lead | null>(null);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
@@ -52,6 +55,17 @@ const Leads = () => {
         return <Badge variant="destructive">Negativo</Badge>;
       case 'pending':
         return <Badge variant="outline">Pendente</Badge>;
+    }
+  };
+
+  const handleEditLead = (lead: Lead) => {
+    setEditingLead(lead);
+    setIsDialogOpen(true);
+  };
+
+  const handleSaveLead = async (updatedLead: Lead) => {
+    if (updatedLead.id) {
+      await updateLead(updatedLead.id, updatedLead);
     }
   };
 
@@ -186,7 +200,12 @@ const Leads = () => {
                         </a>
                       </TableCell>
                       <TableCell>
-                        <Button variant="ghost" size="sm">
+                        <Button 
+                          variant="ghost" 
+                          size="sm"
+                          onClick={() => handleEditLead(lead)}
+                        >
+                          <Edit className="h-4 w-4 mr-2" />
                           Editar
                         </Button>
                       </TableCell>
@@ -214,6 +233,13 @@ const Leads = () => {
           </CardContent>
         </Card>
       )}
+
+      <LeadEditDialog
+        lead={editingLead}
+        open={isDialogOpen}
+        onOpenChange={setIsDialogOpen}
+        onSave={handleSaveLead}
+      />
     </div>
   );
 };
