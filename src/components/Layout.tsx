@@ -1,6 +1,6 @@
 import { ReactNode } from 'react';
 import { NavLink } from './NavLink';
-import { Merge, BarChart3, Users, TrendingUp } from 'lucide-react';
+import { Merge, BarChart3, Users, TrendingUp, Calendar } from 'lucide-react';
 
 interface LayoutProps {
   children: ReactNode;
@@ -25,6 +25,9 @@ export const Layout = ({ children }: LayoutProps) => {
           <div className="flex gap-1">
             <NavLink to="/" icon={<TrendingUp className="h-4 w-4" />}>
               Campanhas
+            </NavLink>
+            <NavLink to="/events" icon={<Calendar className="h-4 w-4" />}>
+              Eventos
             </NavLink>
             <NavLink to="/leads" icon={<Users className="h-4 w-4" />}>
               Leads
