@@ -6,12 +6,12 @@ import { MergeConfiguration } from '@/components/MergeConfiguration';
 import { MergePreview } from '@/components/MergePreview';
 import { ExportOptions } from '@/components/ExportOptions';
 import { Button } from '@/components/ui/button';
-import { Merge, ArrowLeft } from 'lucide-react';
+import { Merge as MergeIcon, ArrowLeft } from 'lucide-react';
 import { toast } from 'sonner';
 
 type Step = 'upload' | 'configure' | 'preview' | 'export';
 
-const Index = () => {
+const MergePage = () => {
   const [step, setStep] = useState<Step>('upload');
   const [files, setFiles] = useState<ParsedFile[]>([]);
   const [mainFileIndex, setMainFileIndex] = useState(0);
@@ -59,17 +59,16 @@ const Index = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="container mx-auto px-4 py-8 max-w-7xl">
-        {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-4xl font-bold text-foreground mb-2">
-            Data Merge Pro
-          </h1>
-          <p className="text-muted-foreground">
-            Unifique seus dados de leads e empresas com inteligência
-          </p>
-        </div>
+    <div className="max-w-7xl mx-auto">
+      {/* Header */}
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold text-foreground mb-2">
+          Merge de Dados
+        </h1>
+        <p className="text-muted-foreground">
+          Unifique seus dados de leads e empresas com inteligência
+        </p>
+      </div>
 
         {/* Progress Steps */}
         <div className="mb-8 flex items-center justify-between max-w-2xl mx-auto">
@@ -107,8 +106,8 @@ const Index = () => {
           })}
         </div>
 
-        {/* Content */}
-        <div className="space-y-6">
+      {/* Content */}
+      <div className="space-y-6">
           {step === 'upload' && (
             <FileUpload onFilesProcessed={handleFilesProcessed} />
           )}
@@ -140,7 +139,7 @@ const Index = () => {
                   Voltar
                 </Button>
                 <Button onClick={handlePreviewMerge} size="lg">
-                  <Merge className="mr-2 h-5 w-5" />
+                  <MergeIcon className="mr-2 h-5 w-5" />
                   Gerar Preview do Merge
                 </Button>
               </div>
@@ -182,10 +181,9 @@ const Index = () => {
               </div>
             </>
           )}
-        </div>
       </div>
     </div>
   );
 };
 
-export default Index;
+export default MergePage;
