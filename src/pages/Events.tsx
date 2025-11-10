@@ -35,6 +35,7 @@ const Events = () => {
   const [campaign2, setCampaign2] = useState<string>('_placeholder2');
 
   const eventAnalysis = getEventLeadsAnalysis();
+  const validEvents = eventAnalysis.filter(e => e.eventName && e.eventName.trim() !== '');
   const recurrentLeads = getRecurrentLeads();
   const groupedCampaigns = groupMetricsByCampaign(campaignMetrics);
 
@@ -235,8 +236,8 @@ const Events = () => {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todos os Leads Recorrentes</SelectItem>
-              {eventAnalysis.length > 0 ? (
-                eventAnalysis.map(event => (
+              {validEvents.length > 0 ? (
+                validEvents.map(event => (
                   <SelectItem key={event.eventName} value={event.eventName}>
                     {event.eventName} ({event.totalLeads} leads)
                   </SelectItem>
