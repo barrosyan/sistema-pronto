@@ -231,15 +231,25 @@ const Campaigns = () => {
     try {
       const data = await parseExcelSheets(files[0]);
       
+      console.log('Dados parseados:', {
+        metrics: data.campaignMetrics.length,
+        positiveLeads: data.positiveLeads.length,
+        negativeLeads: data.negativeLeads.length,
+        sampleData: data
+      });
+      
       // Extrair nome sugerido da campanha do arquivo CSV Kontax
       let suggestedName = '';
       if (fileName.endsWith('.csv')) {
         suggestedName = files[0].name
           .replace(/^Perfil_.*?_-_/, '')
           .replace(/_all_leads\.csv$/, '')
+          .replace(/_all_leads-\d+\.csv$/, '')
           .replace(/_/g, ' ')
           .trim();
       }
+      
+      console.log('Nome sugerido:', suggestedName);
       
       // Armazenar dados temporariamente e abrir diálogo de seleção
       setPendingFileData(data);

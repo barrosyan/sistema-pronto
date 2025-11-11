@@ -108,13 +108,18 @@ function parseExcelFile(file: File): Promise<ParsedCampaignData> {
 function isKontaxLeadsFormat(data: any[]): boolean {
   if (data.length === 0) return false;
   const firstRow = data[0];
+  console.log('Verificando formato Kontax. Primeira linha:', firstRow);
+  console.log('Colunas encontradas:', Object.keys(firstRow));
   const kontaxColumns = ['First Name', 'Last Name', 'Company', 'Position', 'linkedin_url', 'Connected At'];
-  return kontaxColumns.every(col => col in firstRow);
+  const hasAllColumns = kontaxColumns.every(col => col in firstRow);
+  console.log('Tem todas as colunas Kontax?', hasAllColumns);
+  return hasAllColumns;
 }
 
 // Converte leads do formato Kontax para o formato do sistema
 function convertKontaxLeadsToSystemFormat(data: any[], campaignName: string): Lead[] {
-  return data.map((row, index) => ({
+  console.log(`Convertendo ${data.length} leads do formato Kontax para campanha: ${campaignName}`);
+  const leads = data.map((row, index) => ({
     id: `kontax-lead-${index}-${Date.now()}`,
     campaign: campaignName,
     linkedin: normalizeAndValidate(row.linkedin_url),
@@ -149,6 +154,8 @@ function convertKontaxLeadsToSystemFormat(data: any[], campaignName: string): Le
     pavilion: '',
     stand: ''
   }));
+  console.log('Leads convertidos:', leads.length);
+  return leads;
 }
 
 function processCampaignData(data: any[]): ParsedCampaignData {
