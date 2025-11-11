@@ -10,6 +10,7 @@ import { useCampaignData } from '@/hooks/useCampaignData';
 import { groupMetricsByCampaign } from '@/utils/campaignParser';
 import { supabase } from '@/integrations/supabase/client';
 import { CampaignDialog } from '@/components/CampaignDialog';
+import { CampaignSelectionDialog } from '@/components/CampaignSelectionDialog';
 
 const Campaigns = () => {
   const navigate = useNavigate();
@@ -17,6 +18,9 @@ const Campaigns = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [inputData, setInputData] = useState('');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isCampaignSelectionOpen, setIsCampaignSelectionOpen] = useState(false);
+  const [pendingFileData, setPendingFileData] = useState<any>(null);
+  const [suggestedCampaignName, setSuggestedCampaignName] = useState('');
 
   useEffect(() => {
     loadFromDatabase();
@@ -227,29 +231,71 @@ const Campaigns = () => {
     try {
       const data = await parseExcelSheets(files[0]);
       
+      // Extrair nome sugerido da campanha do arquivo CSV Kontax
+      let suggestedName = '';
+      if (fileName.endsWith('.csv')) {
+        suggestedName = files[0].name
+          .replace(/^Perfil_.*?_-_/, '')
+          .replace(/_all_leads\.csv$/, '')
+          .replace(/_/g, ' ')
+          .trim();
+      }
+      
+      // Armazenar dados temporariamente e abrir diálogo de seleção
+      setPendingFileData(data);
+      setSuggestedCampaignName(suggestedName);
+      setIsCampaignSelectionOpen(true);
+    } catch (error) {
+      console.error('Error processing file:', error);
+      toast.error('Erro ao processar arquivo');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleCampaignSelection = async (selectedCampaignName: string) => {
+    if (!pendingFileData) return;
+
+    setIsLoading(true);
+    setIsCampaignSelectionOpen(false);
+
+    try {
+      const data = pendingFileData;
+      
+      // Atualizar nome da campanha nos leads
+      const updateCampaignName = (leads: any[]) => 
+        leads.map(lead => ({ ...lead, campaign: selectedCampaignName }));
+
+      const updatedPositiveLeads = updateCampaignName(data.positiveLeads);
+      const updatedNegativeLeads = updateCampaignName(data.negativeLeads);
+      
       const metricsCount = data.campaignMetrics.length;
-      const posLeadsCount = data.positiveLeads.length;
-      const negLeadsCount = data.negativeLeads.length;
+      const posLeadsCount = updatedPositiveLeads.length;
+      const negLeadsCount = updatedNegativeLeads.length;
       
       // Adiciona os dados ao banco
       if (metricsCount > 0) await addCampaignMetrics(data.campaignMetrics);
-      if (posLeadsCount > 0) await addPositiveLeads(data.positiveLeads);
-      if (negLeadsCount > 0) await addNegativeLeads(data.negativeLeads);
+      if (posLeadsCount > 0) await addPositiveLeads(updatedPositiveLeads);
+      if (negLeadsCount > 0) await addNegativeLeads(updatedNegativeLeads);
       
       // Mensagem de sucesso detalhada
       const parts = [];
       if (metricsCount > 0) parts.push(`${metricsCount} métricas`);
-      if (posLeadsCount > 0) parts.push(`${posLeadsCount} leads positivos`);
-      if (negLeadsCount > 0) parts.push(`${negLeadsCount} leads negativos`);
+      if (posLeadsCount > 0) parts.push(`${posLeadsCount} leads`);
+      if (negLeadsCount > 0) parts.push(`${negLeadsCount} leads`);
       
       if (parts.length > 0) {
-        toast.success(`Dados adicionados: ${parts.join(', ')}`);
+        toast.success(`Dados adicionados à campanha "${selectedCampaignName}": ${parts.join(', ')}`);
       } else {
         toast.warning('Nenhum dado foi encontrado no arquivo');
       }
+      
+      // Limpar dados temporários
+      setPendingFileData(null);
+      setSuggestedCampaignName('');
     } catch (error) {
-      console.error('Error processing file:', error);
-      toast.error('Erro ao processar arquivo');
+      console.error('Error saving campaign data:', error);
+      toast.error('Erro ao salvar dados da campanha');
     } finally {
       setIsLoading(false);
     }
@@ -407,6 +453,14 @@ const Campaigns = () => {
         open={isDialogOpen}
         onOpenChange={setIsDialogOpen}
         onSave={handleCreateCampaign}
+      />
+
+      <CampaignSelectionDialog
+        open={isCampaignSelectionOpen}
+        onOpenChange={setIsCampaignSelectionOpen}
+        onConfirm={handleCampaignSelection}
+        existingCampaigns={campaignsList.map(c => c.name)}
+        suggestedName={suggestedCampaignName}
       />
     </div>
   );

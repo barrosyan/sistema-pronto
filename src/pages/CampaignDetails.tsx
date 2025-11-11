@@ -2,10 +2,12 @@ import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, TrendingUp, Users, Mail, Calendar } from 'lucide-react';
+import { ArrowLeft, TrendingUp, Users, Mail, Calendar, Upload } from 'lucide-react';
 import { useCampaignData } from '@/hooks/useCampaignData';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { toast } from 'sonner';
+import { parseExcelSheets } from '@/utils/excelSheetParser';
 import {
   Table,
   TableBody,
@@ -31,9 +33,10 @@ const ITEMS_PER_PAGE = 15;
 const CampaignDetails = () => {
   const { campaignName } = useParams<{ campaignName: string }>();
   const navigate = useNavigate();
-  const { campaignMetrics, getAllLeads } = useCampaignData();
+  const { campaignMetrics, getAllLeads, addPositiveLeads, addNegativeLeads } = useCampaignData();
   const [dailyPage, setDailyPage] = useState(1);
   const [weeklyPage, setWeeklyPage] = useState(1);
+  const [isUploading, setIsUploading] = useState(false);
 
   const decodedName = decodeURIComponent(campaignName || '');
   const campaignData = campaignMetrics.filter(m => m.campaignName === decodedName);
@@ -130,13 +133,68 @@ const CampaignDetails = () => {
 
   const weeklyMetrics = getWeeklyMetrics();
 
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
+
+    setIsUploading(true);
+    const fileName = files[0].name.toLowerCase();
+    const fileType = fileName.endsWith('.csv') ? 'CSV' : 'Excel';
+    toast.info(`Processando arquivo ${fileType}...`);
+
+    try {
+      const data = await parseExcelSheets(files[0]);
+      
+      // Atualizar nome da campanha nos leads para esta campanha específica
+      const updateCampaignName = (leads: any[]) => 
+        leads.map(lead => ({ ...lead, campaign: decodedName }));
+
+      const updatedPositiveLeads = updateCampaignName(data.positiveLeads);
+      const updatedNegativeLeads = updateCampaignName(data.negativeLeads);
+      
+      const posLeadsCount = updatedPositiveLeads.length;
+      const negLeadsCount = updatedNegativeLeads.length;
+      
+      // Adiciona os dados ao banco
+      if (posLeadsCount > 0) await addPositiveLeads(updatedPositiveLeads);
+      if (negLeadsCount > 0) await addNegativeLeads(updatedNegativeLeads);
+      
+      if (posLeadsCount > 0 || negLeadsCount > 0) {
+        toast.success(`${posLeadsCount + negLeadsCount} leads adicionados à campanha "${decodedName}"`);
+      } else {
+        toast.warning('Nenhum lead foi encontrado no arquivo');
+      }
+    } catch (error) {
+      console.error('Error processing file:', error);
+      toast.error('Erro ao processar arquivo');
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
   return (
     <div className="max-w-7xl mx-auto space-y-6">
-      <div className="flex items-center gap-4">
-        <Button variant="ghost" onClick={() => navigate('/')}>
-          <ArrowLeft className="mr-2 h-4 w-4" />
-          Voltar
-        </Button>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" onClick={() => navigate('/')}>
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Voltar
+          </Button>
+        </div>
+        
+        <div>
+          <Button variant="outline" onClick={() => document.getElementById('campaign-detail-upload')?.click()} disabled={isUploading}>
+            <Upload className="mr-2 h-4 w-4" />
+            {isUploading ? 'Importando...' : 'Importar Leads'}
+          </Button>
+          <input
+            id="campaign-detail-upload"
+            type="file"
+            accept=".csv,.xlsx,.xls"
+            className="hidden"
+            onChange={handleFileUpload}
+          />
+        </div>
       </div>
 
       <div>
