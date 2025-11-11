@@ -471,6 +471,8 @@ const Campaigns = () => {
         onConfirm={handleCampaignSelection}
         existingCampaigns={campaignsList.map(c => c.name)}
         suggestedName={suggestedCampaignName}
+        positiveLeads={pendingFileData?.positiveLeads}
+        negativeLeads={pendingFileData?.negativeLeads}
       />
     </div>
   );
