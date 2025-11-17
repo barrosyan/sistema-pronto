@@ -1,279 +1,407 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Upload, Trash2, Download, FileSpreadsheet, FileText } from 'lucide-react';
-import { toast } from 'sonner';
-import { supabase } from '@/integrations/supabase/client';
 import { Input } from '@/components/ui/input';
-
-type FileUpload = {
-  id: string;
-  file_name: string;
-  file_size: number;
-  file_type: string;
-  storage_path: string;
-  uploaded_at: string;
-};
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Button } from '@/components/ui/button';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Badge } from '@/components/ui/badge';
+import { Pencil, Save } from 'lucide-react';
+import { toast } from 'sonner';
+import type { ProfileInfo, ConsolidatedMetrics, ConversionRates, WeeklyActivityCalendar, CampaignComparison } from '@/types/profile';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { WeeklyComparison } from '@/components/WeeklyComparison';
 
 export default function Profile() {
-  const [files, setFiles] = useState<FileUpload[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [uploading, setUploading] = useState(false);
+  const [isEditingInfo, setIsEditingInfo] = useState(false);
+  const [selectedCampaign, setSelectedCampaign] = useState<string>('Todas');
+  const [profileInfo, setProfileInfo] = useState<ProfileInfo>({
+    empresa: 'Presto',
+    perfil: 'Ursula Aleixo',
+    campanhas: [
+      'Ursula Sebrae 100 Startups',
+      'Ursula Sebrae 1000 Startups',
+      'Ursula NEON 2025',
+      'Ursula Web Summit Lisboa 2025'
+    ],
+    objetivoDasCampanhas: 'Conectar com startups e ampliar network em eventos estratégicos',
+    cadencia: 'https://docs.google.com/document/d/...',
+    cargosNaPesquisa: 'Founder, CEO, CTO'
+  });
 
-  useEffect(() => {
-    loadFiles();
-  }, []);
+  const [metrics] = useState<ConsolidatedMetrics>({
+    inicioDoPeriodo: '02/06/2025',
+    fimDoPeriodo: '02/11/2025',
+    campanhasAtivas: 28,
+    diasAtivos: 120,
+    convitesEnviados: 1020,
+    conexoesRealizadas: 578,
+    taxaDeAceiteDeConexao: 57,
+    mensagensEnviadas: 1212,
+    visitas: 1165,
+    likes: 464,
+    comentarios: 0,
+    totalDeAtividades: 3861,
+    respostasPositivas: 149,
+    leadsProcessados: 1373,
+    reunioes: 47,
+    propostas: 7,
+    vendas: 1
+  });
 
-  const loadFiles = async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+  const [conversionRates] = useState<ConversionRates>({
+    respostasPositivasConvitesEnviados: 14.6,
+    respostasPositivasConexoesRealizadas: 25.8,
+    respostasPositivasMensagensEnviadas: 12.3,
+    numeroDeReunioesRespostasPositivas: 31.5,
+    numeroDeReunioesConvitesEnviados: 4.6
+  });
 
-      const result: any = await supabase
-        .from('file_uploads' as any)
-        .select('*')
-        .eq('user_id', user.id)
-        .order('uploaded_at', { ascending: false });
+  const [weeklyCalendar] = useState<WeeklyActivityCalendar[]>([
+    { semana: '02/06/2025', segundaFeira: 'Ativo', tercaFeira: 'Ativo', quartaFeira: 'Ativo', quintaFeira: 'Ativo', sextaFeira: 'Ativo', sabado: 'Inativo', domingo: 'Inativo', diasAtivos: 5 },
+    { semana: '09/06/2025', segundaFeira: 'Ativo', tercaFeira: 'Ativo', quartaFeira: 'Inativo', quintaFeira: 'Ativo', sextaFeira: 'Ativo', sabado: 'Inativo', domingo: 'Inativo', diasAtivos: 4 },
+    { semana: '16/06/2025', segundaFeira: 'Ativo', tercaFeira: 'Ativo', quartaFeira: 'Ativo', quintaFeira: 'Ativo', sextaFeira: 'Ativo', sabado: 'Ativo', domingo: 'Inativo', diasAtivos: 6 },
+  ]);
 
-      if (result.error) throw result.error;
-      setFiles(result.data || []);
-    } catch (error) {
-      console.error('Error loading files:', error);
-      toast.error('Erro ao carregar arquivos');
-    } finally {
-      setLoading(false);
+  const [campaignComparisons] = useState<CampaignComparison[]>([
+    {
+      campaignName: 'Ursula Sebrae 100 Startups',
+      inicioDoPeriodo: '02/06/2025',
+      fimDoPeriodo: '16/06/2025',
+      diasAtivos: 12,
+      convitesEnviados: 120,
+      conexoesRealizadas: 72,
+      taxaDeAceiteDeConexao: 60,
+      mensagensEnviadas: 144,
+      visitas: 132,
+      likes: 52,
+      comentarios: 2,
+      totalDeAtividades: 462,
+      respostasPositivas: 18,
+      leadsProcessados: 132,
+      reunioes: 6,
+      propostas: 2,
+      vendas: 0,
+      respostasPositivasConvitesEnviados: 15,
+      respostasPositivasConexoesRealizadas: 25,
+      respostasPositivasMensagensEnviadas: 12.5,
+      numeroDeReunioesRespostasPositivas: 33.3,
+      numeroDeReunioesConvitesEnviados: 5,
+      observacoes: 'Campanha com bom engajamento inicial',
+      problemasTecnicos: '',
+      ajustesNaPesquisa: '',
+      analiseComparativa: ''
     }
+  ]);
+
+  const handleSaveInfo = () => {
+    setIsEditingInfo(false);
+    toast.success('Informações do perfil atualizadas!');
   };
 
-  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const selectedFiles = event.target.files;
-    if (!selectedFiles || selectedFiles.length === 0) return;
-
-    setUploading(true);
-    
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        toast.error('Usuário não autenticado');
-        return;
-      }
-
-      for (const file of Array.from(selectedFiles)) {
-        // Validate file type
-        const validTypes = [
-          'text/csv',
-          'application/vnd.ms-excel',
-          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-          'application/vnd.oasis.opendocument.spreadsheet'
-        ];
-        
-        if (!validTypes.includes(file.type) && !file.name.match(/\.(csv|xlsx|xls|ods)$/i)) {
-          toast.error(`Arquivo ${file.name} não é um CSV ou Excel válido`);
-          continue;
-        }
-
-        // Upload to storage
-        const fileName = `${Date.now()}_${file.name}`;
-        const storagePath = `${user.id}/${fileName}`;
-
-        const { error: uploadError } = await supabase.storage
-          .from('user-uploads')
-          .upload(storagePath, file);
-
-        if (uploadError) throw uploadError;
-
-        // Save metadata to database
-        const dbResult: any = await supabase
-          .from('file_uploads' as any)
-          .insert({
-            user_id: user.id,
-            file_name: file.name,
-            file_size: file.size,
-            file_type: file.type,
-            storage_path: storagePath
-          });
-
-        if (dbResult.error) throw dbResult.error;
-      }
-
-      toast.success('Arquivos enviados com sucesso!');
-      loadFiles();
-    } catch (error) {
-      console.error('Error uploading files:', error);
-      toast.error('Erro ao enviar arquivos');
-    } finally {
-      setUploading(false);
-      if (event.target) event.target.value = '';
-    }
-  };
-
-  const handleDelete = async (file: FileUpload) => {
-    try {
-      // Delete from storage
-      const { error: storageError } = await supabase.storage
-        .from('user-uploads')
-        .remove([file.storage_path]);
-
-      if (storageError) throw storageError;
-
-      // Delete from database
-      const dbResult: any = await supabase
-        .from('file_uploads' as any)
-        .delete()
-        .eq('id', file.id);
-
-      if (dbResult.error) throw dbResult.error;
-
-      toast.success('Arquivo deletado com sucesso');
-      loadFiles();
-    } catch (error) {
-      console.error('Error deleting file:', error);
-      toast.error('Erro ao deletar arquivo');
-    }
-  };
-
-  const handleDownload = async (file: FileUpload) => {
-    try {
-      const { data, error } = await supabase.storage
-        .from('user-uploads')
-        .download(file.storage_path);
-
-      if (error) throw error;
-
-      const url = URL.createObjectURL(data);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = file.file_name;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-
-      toast.success('Download iniciado');
-    } catch (error) {
-      console.error('Error downloading file:', error);
-      toast.error('Erro ao baixar arquivo');
-    }
-  };
-
-  const formatFileSize = (bytes: number) => {
-    if (bytes === 0) return '0 Bytes';
-    const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
-  };
-
-  const getFileIcon = (fileName: string) => {
-    if (fileName.match(/\.csv$/i)) {
-      return <FileText className="h-5 w-5 text-primary" />;
-    }
-    return <FileSpreadsheet className="h-5 w-5 text-primary" />;
-  };
+  const filteredComparisons = selectedCampaign === 'Todas' 
+    ? campaignComparisons 
+    : campaignComparisons.filter(c => c.campaignName === selectedCampaign);
 
   return (
     <div className="container mx-auto p-6 space-y-6">
       <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold">Perfil do Usuário</h1>
-          <p className="text-muted-foreground mt-1">Gerencie seus arquivos de dados</p>
-        </div>
+        <h1 className="text-3xl font-bold">Perfil de Campanhas</h1>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Meus Arquivos</CardTitle>
-          <CardDescription>
-            Faça upload de arquivos CSV e Excel com dados de campanhas e leads
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            <div className="flex items-center gap-4">
-              <Input
-                id="file-upload"
-                type="file"
-                accept=".csv,.xlsx,.xls,.ods"
-                multiple
-                onChange={handleFileUpload}
-                disabled={uploading}
-                className="hidden"
-              />
-              <Button
-                onClick={() => document.getElementById('file-upload')?.click()}
-                disabled={uploading}
-                className="w-full sm:w-auto"
-              >
-                <Upload className="mr-2 h-4 w-4" />
-                {uploading ? 'Enviando...' : 'Fazer Upload'}
-              </Button>
-            </div>
+      <Tabs defaultValue="info" className="space-y-6">
+        <TabsList className="grid w-full grid-cols-5">
+          <TabsTrigger value="info">Informações</TabsTrigger>
+          <TabsTrigger value="metrics">Métricas Gerais</TabsTrigger>
+          <TabsTrigger value="conversion">Conversão</TabsTrigger>
+          <TabsTrigger value="calendar">Calendário</TabsTrigger>
+          <TabsTrigger value="comparison">Comparação</TabsTrigger>
+        </TabsList>
 
-            {loading ? (
-              <div className="text-center py-8 text-muted-foreground">
-                Carregando arquivos...
+        <TabsContent value="info" className="space-y-4">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle>Informações do Perfil</CardTitle>
+                <CardDescription>Dados gerais sobre o perfil e campanhas</CardDescription>
               </div>
-            ) : files.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                <FileSpreadsheet className="mx-auto h-12 w-12 mb-3 opacity-50" />
-                <p>Nenhum arquivo enviado ainda</p>
-                <p className="text-sm mt-1">Faça upload de seus arquivos CSV ou Excel</p>
+              <Button
+                variant={isEditingInfo ? "default" : "outline"}
+                size="sm"
+                onClick={() => isEditingInfo ? handleSaveInfo() : setIsEditingInfo(true)}
+              >
+                {isEditingInfo ? <><Save className="h-4 w-4 mr-2" /> Salvar</> : <><Pencil className="h-4 w-4 mr-2" /> Editar</>}
+              </Button>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label>Empresa</Label>
+                  {isEditingInfo ? (
+                    <Input
+                      value={profileInfo.empresa}
+                      onChange={(e) => setProfileInfo({...profileInfo, empresa: e.target.value})}
+                    />
+                  ) : (
+                    <p className="text-lg font-medium mt-1">{profileInfo.empresa}</p>
+                  )}
+                </div>
+                <div>
+                  <Label>Perfil</Label>
+                  {isEditingInfo ? (
+                    <Input
+                      value={profileInfo.perfil}
+                      onChange={(e) => setProfileInfo({...profileInfo, perfil: e.target.value})}
+                    />
+                  ) : (
+                    <p className="text-lg font-medium mt-1">{profileInfo.perfil}</p>
+                  )}
+                </div>
               </div>
-            ) : (
-              <div className="border rounded-lg">
+
+              <div>
+                <Label>Campanhas Ativas</Label>
+                <div className="flex flex-wrap gap-2 mt-2">
+                  {profileInfo.campanhas.map((campaign) => (
+                    <Badge key={campaign} variant="secondary">{campaign}</Badge>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <Label>Objetivo das Campanhas</Label>
+                {isEditingInfo ? (
+                  <Textarea
+                    value={profileInfo.objetivoDasCampanhas}
+                    onChange={(e) => setProfileInfo({...profileInfo, objetivoDasCampanhas: e.target.value})}
+                    rows={3}
+                  />
+                ) : (
+                  <p className="mt-1">{profileInfo.objetivoDasCampanhas}</p>
+                )}
+              </div>
+
+              <div>
+                <Label>Cadência</Label>
+                {isEditingInfo ? (
+                  <Input
+                    value={profileInfo.cadencia}
+                    onChange={(e) => setProfileInfo({...profileInfo, cadencia: e.target.value})}
+                  />
+                ) : (
+                  <p className="mt-1 text-primary underline">{profileInfo.cadencia}</p>
+                )}
+              </div>
+
+              <div>
+                <Label>Cargos na Pesquisa</Label>
+                {isEditingInfo ? (
+                  <Input
+                    value={profileInfo.cargosNaPesquisa}
+                    onChange={(e) => setProfileInfo({...profileInfo, cargosNaPesquisa: e.target.value})}
+                  />
+                ) : (
+                  <p className="mt-1">{profileInfo.cargosNaPesquisa}</p>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="metrics" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Métricas Consolidadas</CardTitle>
+              <CardDescription>Período: {metrics.inicioDoPeriodo} - {metrics.fimDoPeriodo}</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-3 gap-6">
+                <div className="space-y-1">
+                  <p className="text-sm text-muted-foreground">Convites Enviados</p>
+                  <p className="text-2xl font-bold">{metrics.convitesEnviados}</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-sm text-muted-foreground">Conexões Realizadas</p>
+                  <p className="text-2xl font-bold">{metrics.conexoesRealizadas}</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-sm text-muted-foreground">Taxa de Aceite</p>
+                  <p className="text-2xl font-bold">{metrics.taxaDeAceiteDeConexao}%</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-sm text-muted-foreground">Mensagens Enviadas</p>
+                  <p className="text-2xl font-bold">{metrics.mensagensEnviadas}</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-sm text-muted-foreground">Respostas Positivas</p>
+                  <p className="text-2xl font-bold">{metrics.respostasPositivas}</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-sm text-muted-foreground">Reuniões</p>
+                  <p className="text-2xl font-bold">{metrics.reunioes}</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-sm text-muted-foreground">Propostas</p>
+                  <p className="text-2xl font-bold">{metrics.propostas}</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-sm text-muted-foreground">Vendas</p>
+                  <p className="text-2xl font-bold">{metrics.vendas}</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-sm text-muted-foreground">Total de Atividades</p>
+                  <p className="text-2xl font-bold">{metrics.totalDeAtividades}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="conversion" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Taxas de Conversão</CardTitle>
+              <CardDescription>Análise de performance do funil de vendas</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="flex justify-between items-center p-4 border rounded-lg">
+                  <span>Respostas Positivas / Convites Enviados</span>
+                  <span className="text-xl font-bold">{conversionRates.respostasPositivasConvitesEnviados}%</span>
+                </div>
+                <div className="flex justify-between items-center p-4 border rounded-lg">
+                  <span>Respostas Positivas / Conexões Realizadas</span>
+                  <span className="text-xl font-bold">{conversionRates.respostasPositivasConexoesRealizadas}%</span>
+                </div>
+                <div className="flex justify-between items-center p-4 border rounded-lg">
+                  <span>Respostas Positivas / Mensagens Enviadas</span>
+                  <span className="text-xl font-bold">{conversionRates.respostasPositivasMensagensEnviadas}%</span>
+                </div>
+                <div className="flex justify-between items-center p-4 border rounded-lg">
+                  <span>Reuniões / Respostas Positivas</span>
+                  <span className="text-xl font-bold">{conversionRates.numeroDeReunioesRespostasPositivas}%</span>
+                </div>
+                <div className="flex justify-between items-center p-4 border rounded-lg">
+                  <span>Reuniões / Convites Enviados</span>
+                  <span className="text-xl font-bold">{conversionRates.numeroDeReunioesConvitesEnviados}%</span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="calendar" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Calendário de Atividades Semanais</CardTitle>
+              <CardDescription>Visualização da atividade por dia da semana</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="w-12"></TableHead>
-                      <TableHead>Nome do Arquivo</TableHead>
-                      <TableHead>Tamanho</TableHead>
-                      <TableHead>Data de Upload</TableHead>
-                      <TableHead className="text-right">Ações</TableHead>
+                      <TableHead>Semana</TableHead>
+                      <TableHead>Seg</TableHead>
+                      <TableHead>Ter</TableHead>
+                      <TableHead>Qua</TableHead>
+                      <TableHead>Qui</TableHead>
+                      <TableHead>Sex</TableHead>
+                      <TableHead>Sáb</TableHead>
+                      <TableHead>Dom</TableHead>
+                      <TableHead>Dias Ativos</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {files.map((file) => (
-                      <TableRow key={file.id}>
-                        <TableCell>{getFileIcon(file.file_name)}</TableCell>
-                        <TableCell className="font-medium">{file.file_name}</TableCell>
-                        <TableCell>{formatFileSize(file.file_size)}</TableCell>
-                        <TableCell>
-                          {new Date(file.uploaded_at).toLocaleDateString('pt-BR', {
-                            day: '2-digit',
-                            month: '2-digit',
-                            year: 'numeric',
-                            hour: '2-digit',
-                            minute: '2-digit'
-                          })}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex justify-end gap-2">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleDownload(file)}
-                            >
-                              <Download className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleDelete(file)}
-                            >
-                              <Trash2 className="h-4 w-4 text-destructive" />
-                            </Button>
-                          </div>
-                        </TableCell>
+                    {weeklyCalendar.map((week) => (
+                      <TableRow key={week.semana}>
+                        <TableCell className="font-medium">{week.semana}</TableCell>
+                        <TableCell><Badge variant={week.segundaFeira === 'Ativo' ? 'default' : 'secondary'}>{week.segundaFeira}</Badge></TableCell>
+                        <TableCell><Badge variant={week.tercaFeira === 'Ativo' ? 'default' : 'secondary'}>{week.tercaFeira}</Badge></TableCell>
+                        <TableCell><Badge variant={week.quartaFeira === 'Ativo' ? 'default' : 'secondary'}>{week.quartaFeira}</Badge></TableCell>
+                        <TableCell><Badge variant={week.quintaFeira === 'Ativo' ? 'default' : 'secondary'}>{week.quintaFeira}</Badge></TableCell>
+                        <TableCell><Badge variant={week.sextaFeira === 'Ativo' ? 'default' : 'secondary'}>{week.sextaFeira}</Badge></TableCell>
+                        <TableCell><Badge variant={week.sabado === 'Ativo' ? 'default' : 'secondary'}>{week.sabado}</Badge></TableCell>
+                        <TableCell><Badge variant={week.domingo === 'Ativo' ? 'default' : 'secondary'}>{week.domingo}</Badge></TableCell>
+                        <TableCell className="font-bold">{week.diasAtivos}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
                 </Table>
               </div>
-            )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="comparison" className="space-y-4">
+          <div className="flex justify-between items-center">
+            <h2 className="text-2xl font-bold">Comparação de Campanhas</h2>
+            <Select value={selectedCampaign} onValueChange={setSelectedCampaign}>
+              <SelectTrigger className="w-[300px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="Todas">Todas as Campanhas</SelectItem>
+                {profileInfo.campanhas.map((campaign) => (
+                  <SelectItem key={campaign} value={campaign}>{campaign}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
-        </CardContent>
-      </Card>
+
+          <WeeklyComparison 
+            weeklyData={campaignComparisons}
+            availableCampaigns={profileInfo.campanhas}
+          />
+
+          {filteredComparisons.map((comparison) => (
+            <Card key={comparison.campaignName}>
+              <CardHeader>
+                <CardTitle>{comparison.campaignName}</CardTitle>
+                <CardDescription>
+                  Período: {comparison.inicioDoPeriodo} - {comparison.fimDoPeriodo} | Dias Ativos: {comparison.diasAtivos}
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-3 gap-4 mb-4">
+                  <div>
+                    <p className="text-sm text-muted-foreground">Convites</p>
+                    <p className="text-xl font-bold">{comparison.convitesEnviados}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Conexões</p>
+                    <p className="text-xl font-bold">{comparison.conexoesRealizadas}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Taxa Aceite</p>
+                    <p className="text-xl font-bold">{comparison.taxaDeAceiteDeConexao}%</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Mensagens</p>
+                    <p className="text-xl font-bold">{comparison.mensagensEnviadas}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Respostas Positivas</p>
+                    <p className="text-xl font-bold">{comparison.respostasPositivas}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Reuniões</p>
+                    <p className="text-xl font-bold">{comparison.reunioes}</p>
+                  </div>
+                </div>
+
+                {comparison.observacoes && (
+                  <div className="mt-4 p-3 bg-muted rounded-lg">
+                    <p className="text-sm font-medium">Observações:</p>
+                    <p className="text-sm">{comparison.observacoes}</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          ))}
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
