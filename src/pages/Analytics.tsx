@@ -383,9 +383,13 @@ export default function Analytics() {
         <p className="text-muted-foreground">Compare métricas {viewMode === 'daily' ? 'diárias' : 'semanais'} entre diferentes campanhas</p>
       </div>
 
-      {/* Seleção de Modo de Visualização */}
-      <Card>
-        <CardContent className="pt-6">
+      {/* Seleção de Modo de Visualização - Destacado */}
+      <Card className="border-primary/50 bg-primary/5">
+        <CardHeader>
+          <CardTitle>Granularidade de Visualização</CardTitle>
+          <CardDescription>Escolha entre visualização diária ou semanal dos dados</CardDescription>
+        </CardHeader>
+        <CardContent>
           <Tabs value={viewMode} onValueChange={(value) => setViewMode(value as 'daily' | 'weekly')}>
             <TabsList className="grid w-full max-w-md grid-cols-2">
               <TabsTrigger value="daily">Visualização Diária</TabsTrigger>
@@ -488,23 +492,27 @@ export default function Analytics() {
                 }), {})}
                 className="h-[300px]"
               >
-                <LineChart data={comparisonData}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="period" />
-                  <YAxis />
-                  <ChartTooltip content={<ChartTooltipContent />} />
-                  <Legend />
-                  {selectedCampaigns.map((campaign, idx) => (
-                    <Line
-                      key={campaign}
-                      type="monotone"
-                      dataKey={`${campaign}_convites`}
-                      stroke={chartColors[idx]}
-                      name={campaign}
-                      strokeWidth={2}
-                    />
-                  ))}
-                </LineChart>
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={comparisonData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="period" />
+                    <YAxis />
+                    <ChartTooltip content={<ChartTooltipContent />} />
+                    <Legend />
+                    {selectedCampaigns.map((campaign, idx) => (
+                      <Line
+                        key={campaign}
+                        type="monotone"
+                        dataKey={`${campaign}_convites`}
+                        stroke={chartColors[idx]}
+                        name={campaign}
+                        strokeWidth={2}
+                        dot={{ r: 4 }}
+                        activeDot={{ r: 6 }}
+                      />
+                    ))}
+                  </LineChart>
+                </ResponsiveContainer>
               </ChartContainer>
             </CardContent>
           </Card>
@@ -562,23 +570,27 @@ export default function Analytics() {
                 }), {})}
                 className="h-[300px]"
               >
-                <LineChart data={comparisonData}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="period" />
-                  <YAxis />
-                  <ChartTooltip content={<ChartTooltipContent />} />
-                  <Legend />
-                  {selectedCampaigns.map((campaign, idx) => (
-                    <Line
-                      key={campaign}
-                      type="monotone"
-                      dataKey={`${campaign}_mensagens`}
-                      stroke={chartColors[idx]}
-                      name={campaign}
-                      strokeWidth={2}
-                    />
-                  ))}
-                </LineChart>
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={comparisonData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="period" />
+                    <YAxis />
+                    <ChartTooltip content={<ChartTooltipContent />} />
+                    <Legend />
+                    {selectedCampaigns.map((campaign, idx) => (
+                      <Line
+                        key={campaign}
+                        type="monotone"
+                        dataKey={`${campaign}_mensagens`}
+                        stroke={chartColors[idx]}
+                        name={campaign}
+                        strokeWidth={2}
+                        dot={{ r: 4 }}
+                        activeDot={{ r: 6 }}
+                      />
+                    ))}
+                  </LineChart>
+                </ResponsiveContainer>
               </ChartContainer>
             </CardContent>
           </Card>
