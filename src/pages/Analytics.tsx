@@ -166,13 +166,12 @@ export default function Analytics() {
       const dataPoint: any = { week };
       selectedCampaigns.forEach(campaign => {
         const weekData = weeklyData[campaign]?.find(w => w.inicioDoPeriodo === week);
-        if (weekData) {
-          dataPoint[`${campaign}_convites`] = weekData.convitesEnviados;
-          dataPoint[`${campaign}_conexoes`] = weekData.conexoesRealizadas;
-          dataPoint[`${campaign}_mensagens`] = weekData.mensagensEnviadas;
-          dataPoint[`${campaign}_respostas`] = weekData.respostasPositivas;
-          dataPoint[`${campaign}_reunioes`] = weekData.reunioes;
-        }
+        // Sempre adicionar os dados, mesmo que seja 0
+        dataPoint[`${campaign}_convites`] = weekData?.convitesEnviados ?? 0;
+        dataPoint[`${campaign}_conexoes`] = weekData?.conexoesRealizadas ?? 0;
+        dataPoint[`${campaign}_mensagens`] = weekData?.mensagensEnviadas ?? 0;
+        dataPoint[`${campaign}_respostas`] = weekData?.respostasPositivas ?? 0;
+        dataPoint[`${campaign}_reunioes`] = weekData?.reunioes ?? 0;
       });
       return dataPoint;
     });
