@@ -1,7 +1,7 @@
 import { ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { NavLink } from './NavLink';
-import { Merge, BarChart3, Users, Sparkles, LogOut, User, Settings } from 'lucide-react';
+import { Merge, BarChart3, Users, Sparkles, LogOut, User, Settings, Target } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from './ui/button';
 import { toast } from 'sonner';
@@ -65,6 +65,9 @@ export const Layout = ({ children }: LayoutProps) => {
           <div className="flex gap-1">
             <NavLink to="/profile" icon={<User className="h-4 w-4" />}>
               Perfil
+            </NavLink>
+            <NavLink to="/campaigns" icon={<Target className="h-4 w-4" />}>
+              Campanhas
             </NavLink>
             <NavLink to="/" icon={<Users className="h-4 w-4" />}>
               Leads

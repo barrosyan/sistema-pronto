@@ -1,481 +1,563 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Upload, Plus, TrendingUp, FileSpreadsheet } from 'lucide-react';
-import { Textarea } from '@/components/ui/textarea';
-import { toast } from 'sonner';
-import { parseExcelSheets } from '@/utils/excelSheetParser';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useCampaignData } from '@/hooks/useCampaignData';
-import { groupMetricsByCampaign } from '@/utils/campaignParser';
-import { supabase } from '@/integrations/supabase/client';
-import { CampaignDialog } from '@/components/CampaignDialog';
-import { CampaignSelectionDialog } from '@/components/CampaignSelectionDialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
+import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { format, startOfWeek, endOfWeek } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 
-const Campaigns = () => {
-  const navigate = useNavigate();
-  const { campaignMetrics, addCampaignMetrics, addPositiveLeads, addNegativeLeads, setCampaignMetrics, setPositiveLeads, setNegativeLeads, loadFromDatabase } = useCampaignData();
-  const [isLoading, setIsLoading] = useState(false);
-  const [inputData, setInputData] = useState('');
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [isCampaignSelectionOpen, setIsCampaignSelectionOpen] = useState(false);
-  const [pendingFileData, setPendingFileData] = useState<any>(null);
-  const [suggestedCampaignName, setSuggestedCampaignName] = useState('');
+interface DailyData {
+  date: string;
+  invitations: number;
+  connections: number;
+  messages: number;
+  visits: number;
+  likes: number;
+  comments: number;
+  positiveResponses: number;
+}
+
+interface WeeklyData {
+  week: string;
+  startDate: string;
+  endDate: string;
+  invitations: number;
+  connections: number;
+  messages: number;
+  visits: number;
+  likes: number;
+  comments: number;
+  positiveResponses: number;
+  meetings: number;
+}
+
+export default function Campaigns() {
+  const { campaignMetrics, getAllLeads, loadFromDatabase, isLoading } = useCampaignData();
+  const [selectedCampaigns, setSelectedCampaigns] = useState<string[]>([]);
+  const [granularity, setGranularity] = useState<'daily' | 'weekly'>('weekly');
 
   useEffect(() => {
     loadFromDatabase();
-  }, []);
+  }, [loadFromDatabase]);
 
-  const loadDataFromDatabase = async () => {
-    setIsLoading(true);
-    try {
-      // Load campaign metrics from database
-      const { data: metricsData, error: metricsError } = await supabase
-        .from('campaign_metrics')
-        .select('*');
+  // Extract unique campaigns
+  const allCampaigns = Array.from(new Set(campaignMetrics.map(m => m.campaignName).filter(Boolean)));
 
-      if (metricsError) throw metricsError;
-
-      // Load leads from database
-      const { data: leadsData, error: leadsError } = await supabase
-        .from('leads')
-        .select('*');
-
-      if (leadsError) throw leadsError;
-
-      if (metricsData && metricsData.length > 0) {
-        const parsedMetrics = metricsData.map(m => ({
-          campaignName: m.campaign_name,
-          eventType: m.event_type,
-          profileName: m.profile_name,
-          totalCount: m.total_count,
-          dailyData: (typeof m.daily_data === 'object' && m.daily_data !== null) 
-            ? (m.daily_data as Record<string, number>) 
-            : {}
-        }));
-        setCampaignMetrics(parsedMetrics);
-      } else {
-        // If database is empty, load from default file
-        await loadDefaultData();
-      }
-
-      if (leadsData && leadsData.length > 0) {
-        const positive = leadsData
-          .filter(l => l.status === 'positive')
-          .map(l => mapDatabaseLeadToType(l));
-        const negative = leadsData
-          .filter(l => l.status === 'negative')
-          .map(l => mapDatabaseLeadToType(l));
-        
-        setPositiveLeads(positive);
-        setNegativeLeads(negative);
-      }
-    } catch (error) {
-      console.error('Error loading data from database:', error);
-      toast.error('Erro ao carregar dados do banco');
-    } finally {
-      setIsLoading(false);
+  useEffect(() => {
+    if (allCampaigns.length > 0 && selectedCampaigns.length === 0) {
+      setSelectedCampaigns([allCampaigns[0]]);
     }
+  }, [allCampaigns]);
+
+  const toggleCampaign = (campaign: string) => {
+    setSelectedCampaigns(prev => 
+      prev.includes(campaign) 
+        ? prev.filter(c => c !== campaign)
+        : [...prev, campaign]
+    );
   };
 
-  const mapDatabaseLeadToType = (dbLead: any): any => {
-    return {
-      id: dbLead.id,
-      campaign: dbLead.campaign,
-      linkedin: dbLead.linkedin,
-      name: dbLead.name,
-      position: dbLead.position,
-      company: dbLead.company,
-      status: dbLead.status,
-      positiveResponseDate: dbLead.positive_response_date,
-      transferDate: dbLead.transfer_date,
-      statusDetails: dbLead.status_details,
-      comments: dbLead.comments,
-      followUp1Date: dbLead.follow_up_1_date,
-      followUp1Comments: dbLead.follow_up_1_comments,
-      followUp2Date: dbLead.follow_up_2_date,
-      followUp2Comments: dbLead.follow_up_2_comments,
-      followUp3Date: dbLead.follow_up_3_date,
-      followUp3Comments: dbLead.follow_up_3_comments,
-      followUp4Date: dbLead.follow_up_4_date,
-      followUp4Comments: dbLead.follow_up_4_comments,
-      observations: dbLead.observations,
-      meetingScheduleDate: dbLead.meeting_schedule_date,
-      meetingDate: dbLead.meeting_date,
-      proposalDate: dbLead.proposal_date,
-      proposalValue: dbLead.proposal_value,
-      saleDate: dbLead.sale_date,
-      saleValue: dbLead.sale_value,
-      profile: dbLead.profile,
-      classification: dbLead.classification,
-      attendedWebinar: dbLead.attended_webinar,
-      whatsapp: dbLead.whatsapp,
-      standDay: dbLead.stand_day,
-      pavilion: dbLead.pavilion,
-      stand: dbLead.stand,
-      negativeResponseDate: dbLead.negative_response_date,
-      hadFollowUp: dbLead.had_follow_up,
-      followUpReason: dbLead.follow_up_reason,
-    };
-  };
-
-  const loadDefaultData = async () => {
-    setIsLoading(true);
-    try {
-      const data = await parseExcelSheets('/data/campaign-data.xlsx');
-      await saveToDatabase(data.campaignMetrics, data.positiveLeads, data.negativeLeads);
-      setCampaignMetrics(data.campaignMetrics);
-      setPositiveLeads(data.positiveLeads);
-      setNegativeLeads(data.negativeLeads);
-      toast.success(`Dados carregados: ${data.campaignMetrics.length} métricas, ${data.positiveLeads.length} leads positivos, ${data.negativeLeads.length} leads negativos`);
-    } catch (error) {
-      console.error('Error loading default data:', error);
-      toast.error('Erro ao carregar dados padrão');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const saveToDatabase = async (metrics: any[], posLeads: any[], negLeads: any[]) => {
-    try {
-      // Get current user
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        toast.error('Usuário não autenticado');
-        return;
-      }
-
-      // Save campaign metrics
-      const metricsToInsert = metrics.map(m => ({
-        campaign_name: m.campaignName,
-        event_type: m.eventType,
-        profile_name: m.profileName,
-        total_count: m.totalCount,
-        daily_data: m.dailyData,
-        user_id: user.id
-      }));
-
-      const { error: metricsError } = await supabase
-        .from('campaign_metrics')
-        .upsert(metricsToInsert, { onConflict: 'campaign_name,event_type,profile_name' });
-
-      if (metricsError) {
-        console.error('Error saving metrics:', metricsError);
-      }
-
-      // Save leads
-      const allLeads = [...posLeads, ...negLeads];
-      const leadsToInsert = allLeads.map(l => ({
-        campaign: l.campaign,
-        linkedin: l.linkedin,
-        name: l.name,
-        position: l.position,
-        company: l.company,
-        status: l.status,
-        user_id: user.id,
-        positive_response_date: l.positiveResponseDate,
-        transfer_date: l.transferDate,
-        status_details: l.statusDetails,
-        comments: l.comments,
-        follow_up_1_date: l.followUp1Date,
-        follow_up_1_comments: l.followUp1Comments,
-        follow_up_2_date: l.followUp2Date,
-        follow_up_2_comments: l.followUp2Comments,
-        follow_up_3_date: l.followUp3Date,
-        follow_up_3_comments: l.followUp3Comments,
-        follow_up_4_date: l.followUp4Date,
-        follow_up_4_comments: l.followUp4Comments,
-        observations: l.observations,
-        meeting_schedule_date: l.meetingScheduleDate,
-        meeting_date: l.meetingDate,
-        proposal_date: l.proposalDate,
-        proposal_value: l.proposalValue,
-        sale_date: l.saleDate,
-        sale_value: l.saleValue,
-        profile: l.profile,
-        classification: l.classification,
-        attended_webinar: l.attendedWebinar,
-        whatsapp: l.whatsapp,
-        stand_day: l.standDay,
-        pavilion: l.pavilion,
-        stand: l.stand,
-        negative_response_date: l.negativeResponseDate,
-        had_follow_up: l.hadFollowUp,
-        follow_up_reason: l.followUpReason,
-      }));
-
-      const { error: leadsError } = await supabase
-        .from('leads')
-        .insert(leadsToInsert);
-
-      if (leadsError) {
-        console.error('Error saving leads:', leadsError);
-      }
-
-      toast.success('Dados salvos no banco de dados com sucesso!');
-    } catch (error) {
-      console.error('Error saving to database:', error);
-      toast.error('Erro ao salvar no banco de dados');
-    }
-  };
-
-  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = event.target.files;
-    if (!files || files.length === 0) return;
-
-    setIsLoading(true);
-    const fileName = files[0].name.toLowerCase();
-    const fileType = fileName.endsWith('.csv') ? 'CSV' : 'Excel';
-    toast.info(`Processando arquivo ${fileType}...`);
-
-    try {
-      const data = await parseExcelSheets(files[0]);
-      
-      console.log('Dados parseados:', {
-        metrics: data.campaignMetrics.length,
-        positiveLeads: data.positiveLeads.length,
-        negativeLeads: data.negativeLeads.length,
-        sampleData: data
-      });
-      
-      // Extrair nome sugerido da campanha do arquivo CSV Kontax
-      let suggestedName = '';
-      if (fileName.endsWith('.csv')) {
-        suggestedName = files[0].name
-          .replace(/^Perfil_.*?_-_/, '')
-          .replace(/_all_leads\.csv$/, '')
-          .replace(/_all_leads-\d+\.csv$/, '')
-          .replace(/_/g, ' ')
-          .trim();
-      }
-      
-      console.log('Nome sugerido:', suggestedName);
-      
-      // Armazenar dados temporariamente e abrir diálogo de seleção
-      setPendingFileData(data);
-      setSuggestedCampaignName(suggestedName);
-      setIsCampaignSelectionOpen(true);
-    } catch (error) {
-      console.error('Error processing file:', error);
-      toast.error('Erro ao processar arquivo');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleCampaignSelection = async (selectedCampaignName: string) => {
-    if (!pendingFileData) return;
-
-    setIsLoading(true);
-    setIsCampaignSelectionOpen(false);
-
-    try {
-      const data = pendingFileData;
-      
-      // Atualizar nome da campanha nos leads
-      const updateCampaignName = (leads: any[]) => 
-        leads.map(lead => ({ ...lead, campaign: selectedCampaignName }));
-
-      const updatedPositiveLeads = updateCampaignName(data.positiveLeads);
-      const updatedNegativeLeads = updateCampaignName(data.negativeLeads);
-      
-      const metricsCount = data.campaignMetrics.length;
-      const posLeadsCount = updatedPositiveLeads.length;
-      const negLeadsCount = updatedNegativeLeads.length;
-      
-      // Adiciona os dados ao banco
-      if (metricsCount > 0) await addCampaignMetrics(data.campaignMetrics);
-      if (posLeadsCount > 0) await addPositiveLeads(updatedPositiveLeads);
-      if (negLeadsCount > 0) await addNegativeLeads(updatedNegativeLeads);
-      
-      // Mensagem de sucesso detalhada
-      const parts = [];
-      if (metricsCount > 0) parts.push(`${metricsCount} métricas`);
-      if (posLeadsCount > 0) parts.push(`${posLeadsCount} leads`);
-      if (negLeadsCount > 0) parts.push(`${negLeadsCount} leads`);
-      
-      if (parts.length > 0) {
-        toast.success(`Dados adicionados à campanha "${selectedCampaignName}": ${parts.join(', ')}`);
-      } else {
-        toast.warning('Nenhum dado foi encontrado no arquivo');
-      }
-      
-      // Limpar dados temporários
-      setPendingFileData(null);
-      setSuggestedCampaignName('');
-    } catch (error) {
-      console.error('Error saving campaign data:', error);
-      toast.error('Erro ao salvar dados da campanha');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleCreateCampaign = async (data: any) => {
-    toast.success(`Campanha "${data.name}" criada com sucesso!`);
-    setIsDialogOpen(false);
-  };
-
-  const groupedCampaigns = groupMetricsByCampaign(campaignMetrics);
-  const campaignsList = Array.from(groupedCampaigns.entries()).map(([name, metrics]) => {
-    const invitations = metrics.find(m => m.eventType === 'Connection Requests Sent')?.totalCount || 0;
-    const connections = metrics.find(m => m.eventType === 'Connection Requests Accepted')?.totalCount || 0;
-    const acceptanceRate = invitations > 0 ? ((connections / invitations) * 100).toFixed(1) : '0';
+  const getDailyDataForCampaign = (campaignName: string): DailyData[] => {
+    const campaignData = campaignMetrics.filter(m => m.campaignName === campaignName);
+    const allDates = new Set<string>();
     
-    return {
-      id: name,
-      name,
-      profile: metrics[0]?.profileName || '',
-      isActive: true,
-      invitations,
-      connections,
-      acceptanceRate
-    };
-  });
+    campaignData.forEach(metric => {
+      Object.keys(metric.dailyData || {}).forEach(date => allDates.add(date));
+    });
+
+    return Array.from(allDates).sort().map(date => {
+      const invitations = campaignData.find(m => m.eventType === 'Connection Requests Sent')?.dailyData?.[date] || 0;
+      const connections = campaignData.find(m => m.eventType === 'Connection Requests Accepted')?.dailyData?.[date] || 0;
+      const messages = campaignData.find(m => m.eventType === 'Messages Sent')?.dailyData?.[date] || 0;
+      const visits = campaignData.find(m => m.eventType === 'Profile Visits')?.dailyData?.[date] || 0;
+      const likes = campaignData.find(m => m.eventType === 'Post Likes')?.dailyData?.[date] || 0;
+      const comments = campaignData.find(m => m.eventType === 'Comments Done')?.dailyData?.[date] || 0;
+
+      const leads = getAllLeads().filter(l => l.campaign === campaignName);
+      const positiveResponses = leads.filter(l => 
+        l.status === 'positive' && l.positiveResponseDate === date
+      ).length;
+
+      return {
+        date,
+        invitations,
+        connections,
+        messages,
+        visits,
+        likes,
+        comments,
+        positiveResponses
+      };
+    });
+  };
+
+  const getWeeklyDataForCampaign = (campaignName: string): WeeklyData[] => {
+    const dailyData = getDailyDataForCampaign(campaignName);
+    const weeklyMap = new Map<string, WeeklyData>();
+
+    dailyData.forEach(day => {
+      const date = new Date(day.date);
+      const weekStart = startOfWeek(date, { locale: ptBR });
+      const weekEnd = endOfWeek(date, { locale: ptBR });
+      const weekKey = format(weekStart, 'yyyy-MM-dd');
+
+      if (!weeklyMap.has(weekKey)) {
+        weeklyMap.set(weekKey, {
+          week: `Semana ${format(weekStart, 'dd/MM')} - ${format(weekEnd, 'dd/MM')}`,
+          startDate: format(weekStart, 'yyyy-MM-dd'),
+          endDate: format(weekEnd, 'yyyy-MM-dd'),
+          invitations: 0,
+          connections: 0,
+          messages: 0,
+          visits: 0,
+          likes: 0,
+          comments: 0,
+          positiveResponses: 0,
+          meetings: 0
+        });
+      }
+
+      const weekData = weeklyMap.get(weekKey)!;
+      weekData.invitations += day.invitations;
+      weekData.connections += day.connections;
+      weekData.messages += day.messages;
+      weekData.visits += day.visits;
+      weekData.likes += day.likes;
+      weekData.comments += day.comments;
+      weekData.positiveResponses += day.positiveResponses;
+    });
+
+    const leads = getAllLeads().filter(l => l.campaign === campaignName);
+    weeklyMap.forEach(weekData => {
+      const weekLeads = leads.filter(l => {
+        if (!l.meetingDate) return false;
+        const meetingDate = new Date(l.meetingDate);
+        return meetingDate >= new Date(weekData.startDate) && meetingDate <= new Date(weekData.endDate);
+      });
+      weekData.meetings = weekLeads.length;
+    });
+
+    return Array.from(weeklyMap.values()).sort((a, b) => a.startDate.localeCompare(b.startDate));
+  };
+
+  const getCombinedData = () => {
+    if (selectedCampaigns.length === 0) return [];
+
+    if (granularity === 'daily') {
+      const allDatesSet = new Set<string>();
+      selectedCampaigns.forEach(campaign => {
+        getDailyDataForCampaign(campaign).forEach(d => allDatesSet.add(d.date));
+      });
+
+      return Array.from(allDatesSet).sort().map(date => {
+        const dataPoint: any = { date };
+        selectedCampaigns.forEach(campaign => {
+          const campaignData = getDailyDataForCampaign(campaign).find(d => d.date === date);
+          dataPoint[`${campaign}_invitations`] = campaignData?.invitations || 0;
+          dataPoint[`${campaign}_connections`] = campaignData?.connections || 0;
+          dataPoint[`${campaign}_messages`] = campaignData?.messages || 0;
+          dataPoint[`${campaign}_visits`] = campaignData?.visits || 0;
+        });
+        return dataPoint;
+      });
+    } else {
+      const allWeeksSet = new Set<string>();
+      selectedCampaigns.forEach(campaign => {
+        getWeeklyDataForCampaign(campaign).forEach(w => allWeeksSet.add(w.week));
+      });
+
+      return Array.from(allWeeksSet).sort().map(week => {
+        const dataPoint: any = { week };
+        selectedCampaigns.forEach(campaign => {
+          const campaignData = getWeeklyDataForCampaign(campaign).find(w => w.week === week);
+          dataPoint[`${campaign}_invitations`] = campaignData?.invitations || 0;
+          dataPoint[`${campaign}_connections`] = campaignData?.connections || 0;
+          dataPoint[`${campaign}_messages`] = campaignData?.messages || 0;
+          dataPoint[`${campaign}_visits`] = campaignData?.visits || 0;
+        });
+        return dataPoint;
+      });
+    }
+  };
+
+  const getCampaignSummary = (campaignName: string) => {
+    const weeklyData = getWeeklyDataForCampaign(campaignName);
+    const totals = weeklyData.reduce((acc, week) => ({
+      invitations: acc.invitations + week.invitations,
+      connections: acc.connections + week.connections,
+      messages: acc.messages + week.messages,
+      visits: acc.visits + week.visits,
+      likes: acc.likes + week.likes,
+      comments: acc.comments + week.comments,
+      positiveResponses: acc.positiveResponses + week.positiveResponses,
+      meetings: acc.meetings + week.meetings
+    }), {
+      invitations: 0,
+      connections: 0,
+      messages: 0,
+      visits: 0,
+      likes: 0,
+      comments: 0,
+      positiveResponses: 0,
+      meetings: 0
+    });
+
+    const acceptanceRate = totals.invitations > 0 
+      ? ((totals.connections / totals.invitations) * 100).toFixed(1)
+      : '0.0';
+
+    return { ...totals, acceptanceRate };
+  };
+
+  const combinedData = getCombinedData();
+
+  const colors = ['#8b5cf6', '#ec4899', '#f59e0b', '#10b981', '#3b82f6', '#ef4444'];
+
+  if (isLoading) {
+    return (
+      <div className="container mx-auto p-6">
+        <Card>
+          <CardContent className="py-12 text-center text-muted-foreground">
+            Carregando dados...
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (allCampaigns.length === 0) {
+    return (
+      <div className="container mx-auto p-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>Sem Dados de Campanhas</CardTitle>
+            <CardDescription>
+              Nenhuma campanha encontrada. Vá para Configurações e faça upload dos arquivos, depois clique em "Processar Todos os Arquivos".
+            </CardDescription>
+          </CardHeader>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold text-foreground">Campanhas Ativas</h1>
-          <p className="text-muted-foreground mt-1">
-            Gerencie e acompanhe suas campanhas de prospecção
-          </p>
-        </div>
-        <div className="flex gap-3">
-          <Button variant="outline" onClick={loadDefaultData} disabled={isLoading}>
-            <FileSpreadsheet className="mr-2 h-4 w-4" />
-            {isLoading ? 'Carregando...' : 'Recarregar Dados'}
-          </Button>
-          
-          <Button variant="outline" onClick={() => document.getElementById('campaign-upload')?.click()} disabled={isLoading}>
-            <Upload className="mr-2 h-4 w-4" />
-            Importar Arquivo
-          </Button>
-          <input
-            id="campaign-upload"
-            type="file"
-            accept=".csv,.xlsx,.xls"
-            className="hidden"
-            onChange={handleFileUpload}
-          />
-          
-          <Button onClick={() => setIsDialogOpen(true)}>
-            <Plus className="mr-2 h-4 w-4" />
-            Nova Campanha
-          </Button>
-        </div>
+      <div>
+        <h1 className="text-3xl font-bold">Campanhas</h1>
+        <p className="text-muted-foreground">Análise detalhada e comparativa de campanhas</p>
       </div>
 
+      {/* Campaign Selection */}
       <Card>
         <CardHeader>
-          <CardTitle>Dados Adicionais de Entrada</CardTitle>
-          <CardDescription>
-            Cole aqui dados adicionais para processar junto com o upload de arquivos (opcional)
-          </CardDescription>
+          <CardTitle>Selecionar Campanhas para Análise</CardTitle>
+          <CardDescription>Selecione uma ou mais campanhas para visualizar e comparar</CardDescription>
         </CardHeader>
         <CardContent>
-          <Textarea
-            placeholder="Cole aqui dados de campanhas, métricas ou observações adicionais..."
-            value={inputData}
-            onChange={(e) => setInputData(e.target.value)}
-            rows={6}
-            className="font-mono text-sm"
-          />
-          {inputData && (
-            <p className="text-sm text-muted-foreground mt-2">
-              {inputData.split('\n').length} linhas de dados inseridas
-            </p>
-          )}
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            {allCampaigns.map(campaign => (
+              <div key={campaign} className="flex items-center space-x-2">
+                <Checkbox
+                  id={campaign}
+                  checked={selectedCampaigns.includes(campaign)}
+                  onCheckedChange={() => toggleCampaign(campaign)}
+                />
+                <Label htmlFor={campaign} className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                  {campaign}
+                </Label>
+              </div>
+            ))}
+          </div>
         </CardContent>
       </Card>
 
-      {campaignsList.length === 0 && !isLoading ? (
-        <Card>
-          <CardContent className="py-12">
-            <div className="text-center">
-              <TrendingUp className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
-              <h3 className="text-lg font-semibold text-foreground mb-2">
-                Nenhuma campanha encontrada
-              </h3>
-              <p className="text-muted-foreground mb-6">
-                Importe dados de campanhas ou crie uma nova para começar
-              </p>
-              <Button onClick={() => document.getElementById('campaign-upload')?.click()}>
-                <Upload className="mr-2 h-4 w-4" />
-                Importar Primeira Campanha
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      ) : isLoading ? (
-        <Card>
-          <CardContent className="py-12">
-            <div className="text-center">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-              <p className="text-muted-foreground">Carregando dados...</p>
-            </div>
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {campaignsList.map((campaign) => (
-            <Card key={campaign.id} className="hover:shadow-lg transition-shadow">
-              <CardHeader>
-                <CardTitle>{campaign.name}</CardTitle>
-                <CardDescription>{campaign.profile}</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Status:</span>
-                    <span className={campaign.isActive ? 'text-success' : 'text-muted-foreground'}>
-                      {campaign.isActive ? 'Ativa' : 'Inativa'}
-                    </span>
+      {/* Granularity Selection */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Granularidade de Dados</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Select value={granularity} onValueChange={(v) => setGranularity(v as 'daily' | 'weekly')}>
+            <SelectTrigger className="w-[200px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="daily">Diário</SelectItem>
+              <SelectItem value="weekly">Semanal</SelectItem>
+            </SelectContent>
+          </Select>
+        </CardContent>
+      </Card>
+
+      {selectedCampaigns.length > 0 && (
+        <>
+          {/* Campaign Summaries */}
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {selectedCampaigns.map(campaign => {
+              const summary = getCampaignSummary(campaign);
+              return (
+                <Card key={campaign}>
+                  <CardHeader>
+                    <CardTitle className="text-lg">{campaign}</CardTitle>
+                    <CardDescription>Resumo Geral</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-2">
+                    <div className="flex justify-between">
+                      <span className="text-sm text-muted-foreground">Convites</span>
+                      <span className="font-bold">{summary.invitations}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-sm text-muted-foreground">Conexões</span>
+                      <span className="font-bold">{summary.connections}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-sm text-muted-foreground">Mensagens</span>
+                      <span className="font-bold">{summary.messages}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-sm text-muted-foreground">Taxa Aceite</span>
+                      <span className="font-bold">{summary.acceptanceRate}%</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-sm text-muted-foreground">Respostas +</span>
+                      <span className="font-bold text-success">{summary.positiveResponses}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-sm text-muted-foreground">Reuniões</span>
+                      <span className="font-bold text-primary">{summary.meetings}</span>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+
+          {/* Charts */}
+          <Tabs defaultValue="invitations" className="w-full">
+            <TabsList className="grid w-full grid-cols-4">
+              <TabsTrigger value="invitations">Convites</TabsTrigger>
+              <TabsTrigger value="connections">Conexões</TabsTrigger>
+              <TabsTrigger value="messages">Mensagens</TabsTrigger>
+              <TabsTrigger value="visits">Visitas</TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="invitations">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Convites Enviados - {granularity === 'daily' ? 'Diário' : 'Semanal'}</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <ResponsiveContainer width="100%" height={400}>
+                    <LineChart data={combinedData}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                      <XAxis 
+                        dataKey={granularity === 'daily' ? 'date' : 'week'} 
+                        stroke="hsl(var(--muted-foreground))"
+                        tick={{ fill: 'hsl(var(--foreground))' }}
+                      />
+                      <YAxis stroke="hsl(var(--muted-foreground))" tick={{ fill: 'hsl(var(--foreground))' }} />
+                      <Tooltip 
+                        contentStyle={{ 
+                          backgroundColor: 'hsl(var(--card))', 
+                          border: '1px solid hsl(var(--border))',
+                          color: 'hsl(var(--foreground))'
+                        }} 
+                      />
+                      <Legend wrapperStyle={{ color: 'hsl(var(--foreground))' }} />
+                      {selectedCampaigns.map((campaign, idx) => (
+                        <Line
+                          key={campaign}
+                          type="monotone"
+                          dataKey={`${campaign}_invitations`}
+                          name={campaign}
+                          stroke={colors[idx % colors.length]}
+                          strokeWidth={2}
+                          dot={{ fill: colors[idx % colors.length], r: 4 }}
+                        />
+                      ))}
+                    </LineChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="connections">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Conexões Realizadas - {granularity === 'daily' ? 'Diário' : 'Semanal'}</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <ResponsiveContainer width="100%" height={400}>
+                    <LineChart data={combinedData}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                      <XAxis 
+                        dataKey={granularity === 'daily' ? 'date' : 'week'} 
+                        stroke="hsl(var(--muted-foreground))"
+                        tick={{ fill: 'hsl(var(--foreground))' }}
+                      />
+                      <YAxis stroke="hsl(var(--muted-foreground))" tick={{ fill: 'hsl(var(--foreground))' }} />
+                      <Tooltip 
+                        contentStyle={{ 
+                          backgroundColor: 'hsl(var(--card))', 
+                          border: '1px solid hsl(var(--border))',
+                          color: 'hsl(var(--foreground))'
+                        }} 
+                      />
+                      <Legend wrapperStyle={{ color: 'hsl(var(--foreground))' }} />
+                      {selectedCampaigns.map((campaign, idx) => (
+                        <Line
+                          key={campaign}
+                          type="monotone"
+                          dataKey={`${campaign}_connections`}
+                          name={campaign}
+                          stroke={colors[idx % colors.length]}
+                          strokeWidth={2}
+                          dot={{ fill: colors[idx % colors.length], r: 4 }}
+                        />
+                      ))}
+                    </LineChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="messages">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Mensagens Enviadas - {granularity === 'daily' ? 'Diário' : 'Semanal'}</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <ResponsiveContainer width="100%" height={400}>
+                    <LineChart data={combinedData}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                      <XAxis 
+                        dataKey={granularity === 'daily' ? 'date' : 'week'} 
+                        stroke="hsl(var(--muted-foreground))"
+                        tick={{ fill: 'hsl(var(--foreground))' }}
+                      />
+                      <YAxis stroke="hsl(var(--muted-foreground))" tick={{ fill: 'hsl(var(--foreground))' }} />
+                      <Tooltip 
+                        contentStyle={{ 
+                          backgroundColor: 'hsl(var(--card))', 
+                          border: '1px solid hsl(var(--border))',
+                          color: 'hsl(var(--foreground))'
+                        }} 
+                      />
+                      <Legend wrapperStyle={{ color: 'hsl(var(--foreground))' }} />
+                      {selectedCampaigns.map((campaign, idx) => (
+                        <Line
+                          key={campaign}
+                          type="monotone"
+                          dataKey={`${campaign}_messages`}
+                          name={campaign}
+                          stroke={colors[idx % colors.length]}
+                          strokeWidth={2}
+                          dot={{ fill: colors[idx % colors.length], r: 4 }}
+                        />
+                      ))}
+                    </LineChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="visits">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Visitas ao Perfil - {granularity === 'daily' ? 'Diário' : 'Semanal'}</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <ResponsiveContainer width="100%" height={400}>
+                    <LineChart data={combinedData}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                      <XAxis 
+                        dataKey={granularity === 'daily' ? 'date' : 'week'} 
+                        stroke="hsl(var(--muted-foreground))"
+                        tick={{ fill: 'hsl(var(--foreground))' }}
+                      />
+                      <YAxis stroke="hsl(var(--muted-foreground))" tick={{ fill: 'hsl(var(--foreground))' }} />
+                      <Tooltip 
+                        contentStyle={{ 
+                          backgroundColor: 'hsl(var(--card))', 
+                          border: '1px solid hsl(var(--border))',
+                          color: 'hsl(var(--foreground))'
+                        }} 
+                      />
+                      <Legend wrapperStyle={{ color: 'hsl(var(--foreground))' }} />
+                      {selectedCampaigns.map((campaign, idx) => (
+                        <Line
+                          key={campaign}
+                          type="monotone"
+                          dataKey={`${campaign}_visits`}
+                          name={campaign}
+                          stroke={colors[idx % colors.length]}
+                          strokeWidth={2}
+                          dot={{ fill: colors[idx % colors.length], r: 4 }}
+                        />
+                      ))}
+                    </LineChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
+
+          {/* Detailed Calendar/Table View */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Calendário Detalhado - {granularity === 'daily' ? 'Dados Diários' : 'Dados Semanais'}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {selectedCampaigns.map(campaign => {
+                const data = granularity === 'daily' 
+                  ? getDailyDataForCampaign(campaign)
+                  : getWeeklyDataForCampaign(campaign);
+                
+                return (
+                  <div key={campaign} className="mb-8">
+                    <h3 className="text-lg font-semibold mb-4">{campaign}</h3>
+                    <div className="overflow-x-auto">
+                      <table className="w-full border-collapse">
+                        <thead>
+                          <tr className="border-b border-border">
+                            <th className="text-left p-2 text-sm font-medium">{granularity === 'daily' ? 'Data' : 'Semana'}</th>
+                            <th className="text-left p-2 text-sm font-medium">Convites</th>
+                            <th className="text-left p-2 text-sm font-medium">Conexões</th>
+                            <th className="text-left p-2 text-sm font-medium">Mensagens</th>
+                            <th className="text-left p-2 text-sm font-medium">Visitas</th>
+                            <th className="text-left p-2 text-sm font-medium">Likes</th>
+                            <th className="text-left p-2 text-sm font-medium">Comentários</th>
+                            <th className="text-left p-2 text-sm font-medium">Resp. +</th>
+                            {granularity === 'weekly' && <th className="text-left p-2 text-sm font-medium">Reuniões</th>}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {data.map((row, idx) => (
+                            <tr key={idx} className="border-b border-border/50 hover:bg-muted/50">
+                              <td className="p-2 text-sm">{granularity === 'daily' ? row.date : (row as WeeklyData).week}</td>
+                              <td className="p-2 text-sm">{row.invitations}</td>
+                              <td className="p-2 text-sm">{row.connections}</td>
+                              <td className="p-2 text-sm">{row.messages}</td>
+                              <td className="p-2 text-sm">{row.visits}</td>
+                              <td className="p-2 text-sm">{row.likes}</td>
+                              <td className="p-2 text-sm">{row.comments}</td>
+                              <td className="p-2 text-sm">{row.positiveResponses}</td>
+                              {granularity === 'weekly' && <td className="p-2 text-sm">{(row as WeeklyData).meetings}</td>}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Convites:</span>
-                    <span className="font-medium">{campaign.invitations}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Conexões:</span>
-                    <span className="font-medium">{campaign.connections}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Taxa de Aceite:</span>
-                    <span className="font-medium">{campaign.acceptanceRate}%</span>
-                  </div>
-                </div>
-                <Button 
-                  className="w-full mt-4" 
-                  variant="outline"
-                  onClick={() => navigate(`/campaign/${encodeURIComponent(campaign.name)}`)}
-                >
-                  Ver Detalhes
-                </Button>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+                );
+              })}
+            </CardContent>
+          </Card>
+        </>
       )}
-
-      <CampaignDialog
-        open={isDialogOpen}
-        onOpenChange={setIsDialogOpen}
-        onSave={handleCreateCampaign}
-      />
-
-      <CampaignSelectionDialog
-        open={isCampaignSelectionOpen}
-        onOpenChange={setIsCampaignSelectionOpen}
-        onConfirm={handleCampaignSelection}
-        existingCampaigns={campaignsList.map(c => c.name)}
-        suggestedName={suggestedCampaignName}
-        positiveLeads={pendingFileData?.positiveLeads}
-        negativeLeads={pendingFileData?.negativeLeads}
-      />
     </div>
   );
-};
-
-export default Campaigns;
+}
