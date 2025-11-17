@@ -180,6 +180,7 @@ function convertKontaxLeadsToSystemFormat(data: any[], campaignName: string): Le
       name: fullName,
       position: normalizeAndValidate(row.Position),
       company: normalizeAndValidate(row.Company),
+      connectionDate: connectionDate, // Data de conexão extraída
       positiveResponseDate: connectionDate, // Data de conexão extraída
       transferDate: null,
       status: 'positive' as const, // Importados como positivos por padrão

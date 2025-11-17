@@ -231,6 +231,7 @@ const Leads = () => {
                     <TableHead>Empresa</TableHead>
                     <TableHead>Campanha</TableHead>
                     <TableHead>Status</TableHead>
+                    <TableHead>Data Conexão</TableHead>
                     <TableHead>LinkedIn</TableHead>
                     <TableHead>Ações</TableHead>
                   </TableRow>
@@ -243,6 +244,11 @@ const Leads = () => {
                       <TableCell>{lead.company}</TableCell>
                       <TableCell>{lead.campaign}</TableCell>
                       <TableCell>{getStatusBadge(lead.status)}</TableCell>
+                      <TableCell>
+                        {lead.connectionDate 
+                          ? new Date(lead.connectionDate).toLocaleDateString('pt-BR')
+                          : '-'}
+                      </TableCell>
                       <TableCell>
                         <a 
                           href={lead.linkedin} 

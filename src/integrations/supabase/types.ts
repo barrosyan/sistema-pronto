@@ -94,6 +94,7 @@ export type Database = {
           classification: string | null
           comments: string | null
           company: string | null
+          connection_date: string | null
           created_at: string | null
           follow_up_1_comments: string | null
           follow_up_1_date: string | null
@@ -136,6 +137,7 @@ export type Database = {
           classification?: string | null
           comments?: string | null
           company?: string | null
+          connection_date?: string | null
           created_at?: string | null
           follow_up_1_comments?: string | null
           follow_up_1_date?: string | null
@@ -178,6 +180,7 @@ export type Database = {
           classification?: string | null
           comments?: string | null
           company?: string | null
+          connection_date?: string | null
           created_at?: string | null
           follow_up_1_comments?: string | null
           follow_up_1_date?: string | null
