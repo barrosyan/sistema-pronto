@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useCampaignData } from '@/hooks/useCampaignData';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -9,6 +9,8 @@ import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, L
 import { format, startOfWeek, endOfWeek } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 interface DailyData {
   date: string;
@@ -42,6 +44,8 @@ export default function Campaigns() {
   const { campaignMetrics, getAllLeads, loadFromDatabase, isLoading } = useCampaignData();
   const [selectedCampaigns, setSelectedCampaigns] = useState<string[]>([]);
   const [granularity, setGranularity] = useState<'daily' | 'weekly'>('weekly');
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
 
   useEffect(() => {
     loadFromDatabase();
@@ -62,6 +66,7 @@ export default function Campaigns() {
         ? prev.filter(c => c !== campaign)
         : [...prev, campaign]
     );
+    setCurrentPage(1); // Reset to first page when campaigns change
   };
 
   const getDailyDataForCampaign = (campaignName: string): DailyData[] => {
@@ -227,6 +232,67 @@ export default function Campaigns() {
   };
 
   const combinedData = getCombinedData();
+  
+  // Get pivot table data for all selected campaigns
+  const getPivotTableData = () => {
+    if (selectedCampaigns.length === 0) return [];
+    
+    if (granularity === 'daily') {
+      const allDatesSet = new Set<string>();
+      selectedCampaigns.forEach(campaign => {
+        getDailyDataForCampaign(campaign).forEach(d => allDatesSet.add(d.date));
+      });
+      
+      return Array.from(allDatesSet).sort().map(date => {
+        const row: any = { date };
+        selectedCampaigns.forEach(campaign => {
+          const campaignData = getDailyDataForCampaign(campaign).find(d => d.date === date);
+          row[`${campaign}_status`] = campaignData?.isActive ? 'Ativo' : 'Inativo';
+          row[`${campaign}_invitations`] = campaignData?.invitations || 0;
+          row[`${campaign}_connections`] = campaignData?.connections || 0;
+          row[`${campaign}_messages`] = campaignData?.messages || 0;
+          row[`${campaign}_positiveResponses`] = campaignData?.positiveResponses || 0;
+        });
+        return row;
+      });
+    } else {
+      const allWeeksSet = new Set<string>();
+      const weekDataMap = new Map<string, { week: string; startDate: string }>();
+      
+      selectedCampaigns.forEach(campaign => {
+        getWeeklyDataForCampaign(campaign).forEach(w => {
+          allWeeksSet.add(w.week);
+          if (!weekDataMap.has(w.week)) {
+            weekDataMap.set(w.week, { week: w.week, startDate: w.startDate });
+          }
+        });
+      });
+      
+      return Array.from(allWeeksSet)
+        .map(week => weekDataMap.get(week)!)
+        .sort((a, b) => a.startDate.localeCompare(b.startDate))
+        .map(({ week }) => {
+          const row: any = { week };
+          selectedCampaigns.forEach(campaign => {
+            const campaignData = getWeeklyDataForCampaign(campaign).find(w => w.week === week);
+            row[`${campaign}_status`] = campaignData ? `${campaignData.activeDays}/${campaignData.totalDays}` : '0/0';
+            row[`${campaign}_invitations`] = campaignData?.invitations || 0;
+            row[`${campaign}_connections`] = campaignData?.connections || 0;
+            row[`${campaign}_messages`] = campaignData?.messages || 0;
+            row[`${campaign}_positiveResponses`] = campaignData?.positiveResponses || 0;
+            row[`${campaign}_meetings`] = campaignData?.meetings || 0;
+          });
+          return row;
+        });
+    }
+  };
+
+  const pivotData = getPivotTableData();
+  const totalPages = Math.ceil(pivotData.length / itemsPerPage);
+  const paginatedData = pivotData.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
 
   const colors = ['#8b5cf6', '#ec4899', '#f59e0b', '#10b981', '#3b82f6', '#ef4444'];
 
@@ -519,73 +585,109 @@ export default function Campaigns() {
             </TabsContent>
           </Tabs>
 
-          {/* Detailed Calendar/Table View */}
+          {/* Pivot Table View */}
           <Card>
             <CardHeader>
-              <CardTitle>Calendário Detalhado - {granularity === 'daily' ? 'Dados Diários' : 'Dados Semanais'}</CardTitle>
+              <CardTitle>Tabela Comparativa - {granularity === 'daily' ? 'Dados Diários' : 'Dados Semanais'}</CardTitle>
+              <CardDescription>Visualização consolidada de todas as campanhas selecionadas</CardDescription>
             </CardHeader>
             <CardContent>
-              {selectedCampaigns.map(campaign => {
-                const data = granularity === 'daily' 
-                  ? getDailyDataForCampaign(campaign)
-                  : getWeeklyDataForCampaign(campaign);
-                
-                return (
-                  <div key={campaign} className="mb-8">
-                    <h3 className="text-lg font-semibold mb-4">{campaign}</h3>
-                    <div className="overflow-x-auto">
-                      <table className="w-full border-collapse">
-                        <thead>
-                          <tr className="border-b border-border">
-                            <th className="text-left p-2 text-sm font-medium">{granularity === 'daily' ? 'Data' : 'Semana'}</th>
-                            <th className="text-left p-2 text-sm font-medium">Status</th>
-                            <th className="text-left p-2 text-sm font-medium">Convites</th>
-                            <th className="text-left p-2 text-sm font-medium">Conexões</th>
-                            <th className="text-left p-2 text-sm font-medium">Mensagens</th>
-                            <th className="text-left p-2 text-sm font-medium">Visitas</th>
-                            <th className="text-left p-2 text-sm font-medium">Likes</th>
-                            <th className="text-left p-2 text-sm font-medium">Comentários</th>
-                            <th className="text-left p-2 text-sm font-medium">Resp. +</th>
-                            {granularity === 'weekly' && <th className="text-left p-2 text-sm font-medium">Reuniões</th>}
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {data.map((row, idx) => {
-                            const isActive = granularity === 'daily' 
-                              ? (row as DailyData).isActive 
-                              : (row as WeeklyData).activeDays > 0;
-                            
-                            return (
-                              <tr key={idx} className="border-b border-border/50 hover:bg-muted/50">
-                                <td className="p-2 text-sm">{granularity === 'daily' ? row.date : (row as WeeklyData).week}</td>
-                                <td className="p-2">
-                                  {granularity === 'daily' ? (
-                                    <Badge variant={isActive ? "default" : "secondary"} className="text-xs">
-                                      {isActive ? 'Ativo' : 'Inativo'}
-                                    </Badge>
-                                  ) : (
-                                    <Badge variant="outline" className="text-xs">
-                                      {(row as WeeklyData).activeDays}/{(row as WeeklyData).totalDays} dias
-                                    </Badge>
-                                  )}
-                                </td>
-                                <td className="p-2 text-sm">{row.invitations}</td>
-                                <td className="p-2 text-sm">{row.connections}</td>
-                                <td className="p-2 text-sm">{row.messages}</td>
-                                <td className="p-2 text-sm">{row.visits}</td>
-                                <td className="p-2 text-sm">{row.likes}</td>
-                                <td className="p-2 text-sm">{row.comments}</td>
-                                <td className="p-2 text-sm">{row.positiveResponses}</td>
-                                {granularity === 'weekly' && <td className="p-2 text-sm">{(row as WeeklyData).meetings}</td>}
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
+              <div className="overflow-x-auto">
+                <table className="w-full border-collapse">
+                  <thead>
+                    <tr className="border-b-2 border-border">
+                      <th className="text-left p-3 text-sm font-semibold sticky left-0 bg-card z-10">
+                        {granularity === 'daily' ? 'Data' : 'Semana'}
+                      </th>
+                      {selectedCampaigns.map(campaign => (
+                        <th key={campaign} colSpan={granularity === 'daily' ? 5 : 6} className="text-center p-3 text-sm font-semibold border-l border-border">
+                          {campaign}
+                        </th>
+                      ))}
+                    </tr>
+                    <tr className="border-b border-border bg-muted/50">
+                      <th className="text-left p-2 text-xs font-medium sticky left-0 bg-muted/50 z-10"></th>
+                      {selectedCampaigns.map(campaign => (
+                        <React.Fragment key={campaign}>
+                          <th className="text-center p-2 text-xs font-medium border-l border-border">Status</th>
+                          <th className="text-center p-2 text-xs font-medium">Convites</th>
+                          <th className="text-center p-2 text-xs font-medium">Conexões</th>
+                          <th className="text-center p-2 text-xs font-medium">Mensagens</th>
+                          <th className="text-center p-2 text-xs font-medium">Resp. +</th>
+                          {granularity === 'weekly' && <th className="text-center p-2 text-xs font-medium">Reuniões</th>}
+                        </React.Fragment>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {paginatedData.map((row, idx) => (
+                      <tr key={idx} className="border-b border-border/50 hover:bg-muted/30">
+                        <td className="p-2 text-sm font-medium sticky left-0 bg-card z-10">
+                          {granularity === 'daily' ? row.date : row.week}
+                        </td>
+                        {selectedCampaigns.map(campaign => {
+                          const status = row[`${campaign}_status`];
+                          const isActive = granularity === 'daily' 
+                            ? status === 'Ativo' 
+                            : status && status !== '0/0';
+                          
+                          return (
+                            <React.Fragment key={campaign}>
+                              <td className="p-2 text-center border-l border-border">
+                                {granularity === 'daily' ? (
+                                  <Badge variant={isActive ? "default" : "secondary"} className="text-xs">
+                                    {status}
+                                  </Badge>
+                                ) : (
+                                  <Badge variant="outline" className="text-xs">
+                                    {status} dias
+                                  </Badge>
+                                )}
+                              </td>
+                              <td className="p-2 text-center text-sm">{row[`${campaign}_invitations`]}</td>
+                              <td className="p-2 text-center text-sm">{row[`${campaign}_connections`]}</td>
+                              <td className="p-2 text-center text-sm">{row[`${campaign}_messages`]}</td>
+                              <td className="p-2 text-center text-sm">{row[`${campaign}_positiveResponses`]}</td>
+                              {granularity === 'weekly' && (
+                                <td className="p-2 text-center text-sm">{row[`${campaign}_meetings`]}</td>
+                              )}
+                            </React.Fragment>
+                          );
+                        })}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              
+              {/* Pagination */}
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between mt-4">
+                  <div className="text-sm text-muted-foreground">
+                    Página {currentPage} de {totalPages} ({pivotData.length} {granularity === 'daily' ? 'dias' : 'semanas'} no total)
                   </div>
-                );
-              })}
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                      disabled={currentPage === 1}
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                      Anterior
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                      disabled={currentPage === totalPages}
+                    >
+                      Próxima
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
         </>
