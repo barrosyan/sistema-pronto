@@ -46,6 +46,20 @@ export default function UserSettings() {
     }
   };
 
+  // Sanitize unsafe file names for storage keys (remove accents and special chars)
+  const sanitizeFileName = (name: string) => {
+    const parts = name.split('.');
+    const ext = parts.length > 1 ? '.' + parts.pop()!.toLowerCase() : '';
+    const base = parts.join('.');
+    const ascii = base.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    const cleaned = ascii
+      .replace(/[^a-zA-Z0-9._-]+/g, '-') // keep only safe chars
+      .replace(/-+/g, '-')               // collapse dashes
+      .replace(/^[-_.]+|[-_.]+$/g, '')   // trim leading/trailing
+      .toLowerCase();
+    return (cleaned || 'file') + ext;
+  };
+
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFiles = event.target.files;
     if (!selectedFiles || selectedFiles.length === 0) return;
@@ -74,12 +88,13 @@ export default function UserSettings() {
         }
 
         // Upload to storage
-        const fileName = `${Date.now()}_${file.name}`;
+        const safeOriginal = sanitizeFileName(file.name);
+        const fileName = `${Date.now()}_${safeOriginal}`;
         const storagePath = `${user.id}/${fileName}`;
 
         const { error: uploadError } = await supabase.storage
           .from('user-uploads')
-          .upload(storagePath, file);
+          .upload(storagePath, file, { contentType: file.type || undefined, upsert: false });
 
         if (uploadError) throw uploadError;
 
