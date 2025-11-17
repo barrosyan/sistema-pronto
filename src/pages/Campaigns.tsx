@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { format, startOfWeek, endOfWeek } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { Badge } from '@/components/ui/badge';
 
 interface DailyData {
   date: string;
@@ -18,6 +19,7 @@ interface DailyData {
   likes: number;
   comments: number;
   positiveResponses: number;
+  isActive: boolean;
 }
 
 interface WeeklyData {
@@ -32,6 +34,8 @@ interface WeeklyData {
   comments: number;
   positiveResponses: number;
   meetings: number;
+  activeDays: number;
+  totalDays: number;
 }
 
 export default function Campaigns() {
@@ -81,6 +85,9 @@ export default function Campaigns() {
         l.status === 'positive' && l.positiveResponseDate === date
       ).length;
 
+      const isActive = invitations > 0 || connections > 0 || messages > 0 || 
+                       visits > 0 || likes > 0 || comments > 0;
+
       return {
         date,
         invitations,
@@ -89,7 +96,8 @@ export default function Campaigns() {
         visits,
         likes,
         comments,
-        positiveResponses
+        positiveResponses,
+        isActive
       };
     });
   };
@@ -116,7 +124,9 @@ export default function Campaigns() {
           likes: 0,
           comments: 0,
           positiveResponses: 0,
-          meetings: 0
+          meetings: 0,
+          activeDays: 0,
+          totalDays: 0
         });
       }
 
@@ -128,6 +138,10 @@ export default function Campaigns() {
       weekData.likes += day.likes;
       weekData.comments += day.comments;
       weekData.positiveResponses += day.positiveResponses;
+      weekData.totalDays += 1;
+      if (day.isActive) {
+        weekData.activeDays += 1;
+      }
     });
 
     const leads = getAllLeads().filter(l => l.campaign === campaignName);
@@ -524,6 +538,7 @@ export default function Campaigns() {
                         <thead>
                           <tr className="border-b border-border">
                             <th className="text-left p-2 text-sm font-medium">{granularity === 'daily' ? 'Data' : 'Semana'}</th>
+                            <th className="text-left p-2 text-sm font-medium">Status</th>
                             <th className="text-left p-2 text-sm font-medium">Convites</th>
                             <th className="text-left p-2 text-sm font-medium">Conexões</th>
                             <th className="text-left p-2 text-sm font-medium">Mensagens</th>
@@ -535,19 +550,36 @@ export default function Campaigns() {
                           </tr>
                         </thead>
                         <tbody>
-                          {data.map((row, idx) => (
-                            <tr key={idx} className="border-b border-border/50 hover:bg-muted/50">
-                              <td className="p-2 text-sm">{granularity === 'daily' ? row.date : (row as WeeklyData).week}</td>
-                              <td className="p-2 text-sm">{row.invitations}</td>
-                              <td className="p-2 text-sm">{row.connections}</td>
-                              <td className="p-2 text-sm">{row.messages}</td>
-                              <td className="p-2 text-sm">{row.visits}</td>
-                              <td className="p-2 text-sm">{row.likes}</td>
-                              <td className="p-2 text-sm">{row.comments}</td>
-                              <td className="p-2 text-sm">{row.positiveResponses}</td>
-                              {granularity === 'weekly' && <td className="p-2 text-sm">{(row as WeeklyData).meetings}</td>}
-                            </tr>
-                          ))}
+                          {data.map((row, idx) => {
+                            const isActive = granularity === 'daily' 
+                              ? (row as DailyData).isActive 
+                              : (row as WeeklyData).activeDays > 0;
+                            
+                            return (
+                              <tr key={idx} className="border-b border-border/50 hover:bg-muted/50">
+                                <td className="p-2 text-sm">{granularity === 'daily' ? row.date : (row as WeeklyData).week}</td>
+                                <td className="p-2">
+                                  {granularity === 'daily' ? (
+                                    <Badge variant={isActive ? "default" : "secondary"} className="text-xs">
+                                      {isActive ? 'Ativo' : 'Inativo'}
+                                    </Badge>
+                                  ) : (
+                                    <Badge variant="outline" className="text-xs">
+                                      {(row as WeeklyData).activeDays}/{(row as WeeklyData).totalDays} dias
+                                    </Badge>
+                                  )}
+                                </td>
+                                <td className="p-2 text-sm">{row.invitations}</td>
+                                <td className="p-2 text-sm">{row.connections}</td>
+                                <td className="p-2 text-sm">{row.messages}</td>
+                                <td className="p-2 text-sm">{row.visits}</td>
+                                <td className="p-2 text-sm">{row.likes}</td>
+                                <td className="p-2 text-sm">{row.comments}</td>
+                                <td className="p-2 text-sm">{row.positiveResponses}</td>
+                                {granularity === 'weekly' && <td className="p-2 text-sm">{(row as WeeklyData).meetings}</td>}
+                              </tr>
+                            );
+                          })}
                         </tbody>
                       </table>
                     </div>
