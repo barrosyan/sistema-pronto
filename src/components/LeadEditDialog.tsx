@@ -111,6 +111,16 @@ export const LeadEditDialog = ({ lead, open, onOpenChange, onSave }: LeadEditDia
             />
           </div>
 
+          <div className="space-y-2">
+            <Label htmlFor="connectionDate">Data de Conexão</Label>
+            <Input
+              id="connectionDate"
+              type="date"
+              value={editedLead.connectionDate || ''}
+              onChange={(e) => setEditedLead({ ...editedLead, connectionDate: e.target.value })}
+            />
+          </div>
+
           {editedLead.status === 'positive' && (
             <>
               <div className="grid grid-cols-2 gap-4">
