@@ -86,6 +86,39 @@ export type Database = {
         }
         Relationships: []
       }
+      file_uploads: {
+        Row: {
+          file_name: string
+          file_size: number
+          file_type: string
+          id: string
+          storage_path: string
+          updated_at: string
+          uploaded_at: string
+          user_id: string
+        }
+        Insert: {
+          file_name: string
+          file_size: number
+          file_type: string
+          id?: string
+          storage_path: string
+          updated_at?: string
+          uploaded_at?: string
+          user_id: string
+        }
+        Update: {
+          file_name?: string
+          file_size?: number
+          file_type?: string
+          id?: string
+          storage_path?: string
+          updated_at?: string
+          uploaded_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       leads: {
         Row: {
           attended_webinar: boolean | null
