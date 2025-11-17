@@ -739,7 +739,38 @@ export default function Profile() {
             </Card>
           </TabsContent>
 
-          <TabsContent value="weekly">
+          <TabsContent value="weekly" className="space-y-6">
+            {/* Comparação Entre Campanhas */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Comparação Semanal Entre Campanhas</CardTitle>
+                <CardDescription>Compare métricas semanais de múltiplas campanhas lado a lado</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Selecionar Campanhas para Comparar (máximo 4)</Label>
+                    <div className="space-y-2">
+                      {profileInfo.campanhas.slice(0, 4).map((campaign, idx) => (
+                        <label key={idx} className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            className="w-4 h-4"
+                            defaultChecked={idx < 2}
+                            onChange={(e) => {
+                              // Handle campaign selection for comparison
+                            }}
+                          />
+                          <span className="text-sm">{campaign}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Métricas Semanais Detalhadas */}
             <Card>
               <CardHeader>
                 <div className="flex items-center justify-between">

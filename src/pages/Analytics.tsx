@@ -1,400 +1,446 @@
+import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { TrendingUp, Users, Mail, Calendar, Activity } from 'lucide-react';
-import { useCampaignData } from '@/hooks/useCampaignData';
-import { useEffect, useMemo, useState } from 'react';
-import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
-import { Area, AreaChart, Bar, BarChart, CartesianGrid, Line, LineChart, XAxis, YAxis } from 'recharts';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
+import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
+import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend, ResponsiveContainer } from 'recharts';
+import type { WeeklyMetrics } from '@/types/profile';
 
-const Analytics = () => {
-  const { campaignMetrics, positiveLeads, negativeLeads, loadFromDatabase } = useCampaignData();
-  const [selectedCampaign, setSelectedCampaign] = useState<string>('all');
+export default function Analytics() {
+  const [selectedCampaigns, setSelectedCampaigns] = useState<string[]>([
+    'Ursula Sebrae 100 Startups',
+    'Ursula NEON 2025'
+  ]);
 
-  useEffect(() => {
-    loadFromDatabase();
-  }, [loadFromDatabase]);
+  // Mock data - Em produção, isso viria do banco de dados
+  const allCampaigns = [
+    'Ursula Sebrae 100 Startups',
+    'Ursula Sebrae 1000 Startups',
+    'Ursula NEON 2025',
+    'Ursula Web Summit Lisboa 2025'
+  ];
 
-  const availableCampaigns = useMemo(() => {
-    const campaigns = new Set(campaignMetrics.map(m => m.campaignName).filter(Boolean));
-    return Array.from(campaigns);
-  }, [campaignMetrics]);
+  const weeklyData: Record<string, WeeklyMetrics[]> = {
+    'Ursula Sebrae 100 Startups': [
+      {
+        semana: '1ª Semana',
+        inicioDoPeriodo: '02/06/2025',
+        fimDoPeriodo: '08/06/2025',
+        diasAtivos: 5,
+        convitesEnviados: 45,
+        conexoesRealizadas: 28,
+        taxaDeAceiteDeConexao: 62,
+        mensagensEnviadas: 52,
+        visitas: 48,
+        likes: 18,
+        comentarios: 0,
+        totalDeAtividades: 146,
+        respostasPositivas: 8,
+        leadsProcessados: 45,
+        reunioes: 2,
+        propostas: 0,
+        vendas: 0,
+        respostasPositivasConvitesEnviados: 17.8,
+        respostasPositivasConexoesRealizadas: 28.6,
+        respostasPositivasMensagensEnviadas: 15.4,
+        numeroDeReunioesRespostasPositivas: 25.0,
+        numeroDeReunioesConvitesEnviados: 4.4,
+        campanhasAtivas: ['Ursula Sebrae 100 Startups'],
+        observacoes: '',
+        problemasTecnicos: '',
+        ajustesNaPesquisa: '',
+        analiseComparativa: ''
+      },
+      {
+        semana: '2ª Semana',
+        inicioDoPeriodo: '09/06/2025',
+        fimDoPeriodo: '15/06/2025',
+        diasAtivos: 4,
+        convitesEnviados: 38,
+        conexoesRealizadas: 22,
+        taxaDeAceiteDeConexao: 58,
+        mensagensEnviadas: 45,
+        visitas: 42,
+        likes: 15,
+        comentarios: 0,
+        totalDeAtividades: 125,
+        respostasPositivas: 6,
+        leadsProcessados: 38,
+        reunioes: 1,
+        propostas: 0,
+        vendas: 0,
+        respostasPositivasConvitesEnviados: 15.8,
+        respostasPositivasConexoesRealizadas: 27.3,
+        respostasPositivasMensagensEnviadas: 13.3,
+        numeroDeReunioesRespostasPositivas: 16.7,
+        numeroDeReunioesConvitesEnviados: 2.6,
+        campanhasAtivas: ['Ursula Sebrae 100 Startups'],
+        observacoes: '',
+        problemasTecnicos: '',
+        ajustesNaPesquisa: '',
+        analiseComparativa: ''
+      }
+    ],
+    'Ursula NEON 2025': [
+      {
+        semana: '1ª Semana',
+        inicioDoPeriodo: '02/06/2025',
+        fimDoPeriodo: '08/06/2025',
+        diasAtivos: 5,
+        convitesEnviados: 62,
+        conexoesRealizadas: 38,
+        taxaDeAceiteDeConexao: 61,
+        mensagensEnviadas: 68,
+        visitas: 65,
+        likes: 24,
+        comentarios: 0,
+        totalDeAtividades: 195,
+        respostasPositivas: 12,
+        leadsProcessados: 62,
+        reunioes: 4,
+        propostas: 1,
+        vendas: 0,
+        respostasPositivasConvitesEnviados: 19.4,
+        respostasPositivasConexoesRealizadas: 31.6,
+        respostasPositivasMensagensEnviadas: 17.6,
+        numeroDeReunioesRespostasPositivas: 33.3,
+        numeroDeReunioesConvitesEnviados: 6.5,
+        campanhasAtivas: ['Ursula NEON 2025'],
+        observacoes: '',
+        problemasTecnicos: '',
+        ajustesNaPesquisa: '',
+        analiseComparativa: ''
+      },
+      {
+        semana: '2ª Semana',
+        inicioDoPeriodo: '09/06/2025',
+        fimDoPeriodo: '15/06/2025',
+        diasAtivos: 6,
+        convitesEnviados: 71,
+        conexoesRealizadas: 45,
+        taxaDeAceiteDeConexao: 63,
+        mensagensEnviadas: 78,
+        visitas: 72,
+        likes: 28,
+        comentarios: 0,
+        totalDeAtividades: 222,
+        respostasPositivas: 14,
+        leadsProcessados: 71,
+        reunioes: 5,
+        propostas: 1,
+        vendas: 0,
+        respostasPositivasConvitesEnviados: 19.7,
+        respostasPositivasConexoesRealizadas: 31.1,
+        respostasPositivasMensagensEnviadas: 17.9,
+        numeroDeReunioesRespostasPositivas: 35.7,
+        numeroDeReunioesConvitesEnviados: 7.0,
+        campanhasAtivas: ['Ursula NEON 2025'],
+        observacoes: '',
+        problemasTecnicos: '',
+        ajustesNaPesquisa: '',
+        analiseComparativa: ''
+      }
+    ]
+  };
 
-  const filteredMetrics = useMemo(() => {
-    if (selectedCampaign === 'all') return campaignMetrics;
-    return campaignMetrics.filter(m => m.campaignName === selectedCampaign);
-  }, [campaignMetrics, selectedCampaign]);
+  const handleCampaignToggle = (campaign: string, checked: boolean) => {
+    if (checked) {
+      if (selectedCampaigns.length < 4) {
+        setSelectedCampaigns([...selectedCampaigns, campaign]);
+      }
+    } else {
+      setSelectedCampaigns(selectedCampaigns.filter(c => c !== campaign));
+    }
+  };
 
-  const filteredPositiveLeads = useMemo(() => {
-    if (selectedCampaign === 'all') return positiveLeads;
-    return positiveLeads.filter(l => l.campaign === selectedCampaign);
-  }, [positiveLeads, selectedCampaign]);
-
-  const filteredNegativeLeads = useMemo(() => {
-    if (selectedCampaign === 'all') return negativeLeads;
-    return negativeLeads.filter(l => l.campaign === selectedCampaign);
-  }, [negativeLeads, selectedCampaign]);
-
-  const totalMetrics = useMemo(() => {
-    const invitationsSent = filteredMetrics
-      .filter(m => m.eventType === 'Connection Requests Sent')
-      .reduce((sum, m) => sum + m.totalCount, 0);
-
-    const connectionsAccepted = filteredMetrics
-      .filter(m => m.eventType === 'Connection Requests Accepted')
-      .reduce((sum, m) => sum + m.totalCount, 0);
-
-    const messagesSent = filteredMetrics
-      .filter(m => m.eventType === 'Messages Sent')
-      .reduce((sum, m) => sum + m.totalCount, 0);
-
-    const positiveResponses = filteredPositiveLeads.length;
-    const meetings = filteredPositiveLeads.filter(l => l.meetingDate).length;
-    const acceptanceRate = invitationsSent > 0 ? ((connectionsAccepted / invitationsSent) * 100).toFixed(1) : '0';
-    const conversionRate = messagesSent > 0 ? ((positiveResponses / messagesSent) * 100).toFixed(1) : '0';
-    const meetingRate = positiveResponses > 0 ? ((meetings / positiveResponses) * 100).toFixed(1) : '0';
-
-    return {
-      invitationsSent,
-      connectionsAccepted,
-      messagesSent,
-      positiveResponses,
-      meetings,
-      acceptanceRate,
-      conversionRate,
-      meetingRate,
-    };
-  }, [filteredMetrics, filteredPositiveLeads]);
-
-  const timelineData = useMemo(() => {
-    const dailyData: Record<string, any> = {};
-
-    filteredMetrics.forEach(metric => {
-      Object.entries(metric.dailyData || {}).forEach(([date, count]) => {
-        if (!dailyData[date]) {
-          dailyData[date] = { date };
-        }
-        
-        switch (metric.eventType) {
-          case 'Connection Requests Sent':
-            dailyData[date].invitations = (dailyData[date].invitations || 0) + (count as number);
-            break;
-          case 'Connection Requests Accepted':
-            dailyData[date].connections = (dailyData[date].connections || 0) + (count as number);
-            break;
-          case 'Messages Sent':
-            dailyData[date].messages = (dailyData[date].messages || 0) + (count as number);
-            break;
-          case 'Profile Visits':
-            dailyData[date].visits = (dailyData[date].visits || 0) + (count as number);
-            break;
-        }
+  // Preparar dados para gráficos de comparação
+  const comparisonData = selectedCampaigns.length > 0 ? (() => {
+    const weeks = new Set<string>();
+    selectedCampaigns.forEach(campaign => {
+      weeklyData[campaign]?.forEach(week => {
+        weeks.add(week.inicioDoPeriodo);
       });
     });
 
-    return Object.values(dailyData).sort((a, b) => a.date.localeCompare(b.date));
-  }, [filteredMetrics]);
+    return Array.from(weeks).sort().map(week => {
+      const dataPoint: any = { week };
+      selectedCampaigns.forEach(campaign => {
+        const weekData = weeklyData[campaign]?.find(w => w.inicioDoPeriodo === week);
+        if (weekData) {
+          dataPoint[`${campaign}_convites`] = weekData.convitesEnviados;
+          dataPoint[`${campaign}_conexoes`] = weekData.conexoesRealizadas;
+          dataPoint[`${campaign}_mensagens`] = weekData.mensagensEnviadas;
+          dataPoint[`${campaign}_respostas`] = weekData.respostasPositivas;
+          dataPoint[`${campaign}_reunioes`] = weekData.reunioes;
+        }
+      });
+      return dataPoint;
+    });
+  })() : [];
 
-  const funnelData = useMemo(() => [
-    { label: 'Convites Enviados', value: totalMetrics.invitationsSent, width: '100%' },
-    { label: 'Conexões Realizadas', value: totalMetrics.connectionsAccepted, width: `${totalMetrics.invitationsSent > 0 ? (totalMetrics.connectionsAccepted / totalMetrics.invitationsSent) * 100 : 0}%` },
-    { label: 'Mensagens Enviadas', value: totalMetrics.messagesSent, width: `${totalMetrics.invitationsSent > 0 ? (totalMetrics.messagesSent / totalMetrics.invitationsSent) * 100 : 0}%` },
-    { label: 'Respostas Positivas', value: totalMetrics.positiveResponses, width: `${totalMetrics.invitationsSent > 0 ? (totalMetrics.positiveResponses / totalMetrics.invitationsSent) * 100 : 0}%` },
-    { label: 'Reuniões Marcadas', value: totalMetrics.meetings, width: `${totalMetrics.invitationsSent > 0 ? (totalMetrics.meetings / totalMetrics.invitationsSent) * 100 : 0}%` },
-    { label: 'Propostas', value: filteredPositiveLeads.filter(l => l.proposalDate).length, width: `${totalMetrics.invitationsSent > 0 ? (filteredPositiveLeads.filter(l => l.proposalDate).length / totalMetrics.invitationsSent) * 100 : 0}%` },
-    { label: 'Vendas', value: filteredPositiveLeads.filter(l => l.saleDate).length, width: `${totalMetrics.invitationsSent > 0 ? (filteredPositiveLeads.filter(l => l.saleDate).length / totalMetrics.invitationsSent) * 100 : 0}%` },
-  ], [totalMetrics, filteredPositiveLeads]);
+  const chartColors = ['hsl(var(--chart-1))', 'hsl(var(--chart-2))', 'hsl(var(--chart-3))', 'hsl(var(--chart-4))'];
 
   return (
-    <div className="space-y-6">
+    <div className="container mx-auto p-6 space-y-6">
       <div>
-        <h1 className="text-3xl font-bold text-foreground">Analytics & Insights</h1>
-        <p className="text-muted-foreground mt-1">
-          Visualize métricas e análises comparativas de campanhas
-        </p>
+        <h1 className="text-3xl font-bold">Analytics - Comparação de Campanhas</h1>
+        <p className="text-muted-foreground">Compare métricas semanais entre diferentes campanhas</p>
       </div>
 
+      {/* Seleção de Campanhas */}
       <Card>
         <CardHeader>
-          <CardTitle>Filtrar por Campanha</CardTitle>
+          <CardTitle>Selecionar Campanhas para Comparar</CardTitle>
+          <CardDescription>Escolha até 4 campanhas para visualizar comparativos (mínimo 2)</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="space-y-2">
-            <Label htmlFor="campaign-filter">Campanha</Label>
-            <Select value={selectedCampaign} onValueChange={setSelectedCampaign}>
-              <SelectTrigger id="campaign-filter" className="w-full max-w-md">
-                <SelectValue placeholder="Selecione uma campanha" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todas as Campanhas</SelectItem>
-                {availableCampaigns.map(campaign => (
-                  <SelectItem key={campaign} value={campaign}>
-                    {campaign}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {allCampaigns.map((campaign, idx) => (
+              <div key={idx} className="flex items-center space-x-2">
+                <Checkbox
+                  id={`campaign-${idx}`}
+                  checked={selectedCampaigns.includes(campaign)}
+                  onCheckedChange={(checked) => handleCampaignToggle(campaign, checked as boolean)}
+                  disabled={!selectedCampaigns.includes(campaign) && selectedCampaigns.length >= 4}
+                />
+                <Label
+                  htmlFor={`campaign-${idx}`}
+                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                >
+                  {campaign}
+                </Label>
+              </div>
+            ))}
           </div>
         </CardContent>
       </Card>
 
-      {/* Key Metrics */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Convites Enviados</CardTitle>
-            <Mail className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{totalMetrics.invitationsSent}</div>
-            <p className="text-xs text-muted-foreground">Total de todas as campanhas</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Conexões Realizadas</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{totalMetrics.connectionsAccepted}</div>
-            <p className="text-xs text-muted-foreground">Taxa de aceite: {totalMetrics.acceptanceRate}%</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Respostas Positivas</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{totalMetrics.positiveResponses}</div>
-            <p className="text-xs text-muted-foreground">Taxa de conversão: {totalMetrics.conversionRate}%</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Reuniões Marcadas</CardTitle>
-            <Calendar className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{totalMetrics.meetings}</div>
-            <p className="text-xs text-muted-foreground">Taxa de conversão: {totalMetrics.meetingRate}%</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Funnel */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Funil de Conversão</CardTitle>
-          <CardDescription>Acompanhe a jornada dos leads desde o primeiro contato até a venda</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-3">
-            {funnelData.map((stage, index) => {
-              const percentage = totalMetrics.invitationsSent > 0 
-                ? (stage.value / totalMetrics.invitationsSent) * 100 
-                : 0;
-              
-              return (
-                <div key={index} className="relative">
-                  <div className="flex justify-between mb-1.5">
-                    <span className="text-sm font-medium">{stage.label}</span>
-                    <span className="text-sm text-muted-foreground">
-                      {stage.value} ({percentage.toFixed(1)}%)
-                    </span>
-                  </div>
-                  <div 
-                    className="relative h-12 bg-muted/30 rounded-lg overflow-hidden"
-                    style={{ 
-                      width: `${100 - (index * 8)}%`,
-                      margin: '0 auto'
-                    }}
-                  >
-                    <div 
-                      className="h-full bg-gradient-to-r from-primary to-primary/80 rounded-lg flex items-center justify-center transition-all duration-500"
-                      style={{ width: stage.width }}
-                    >
-                      {percentage > 5 && (
-                        <span className="text-xs font-semibold text-primary-foreground">
-                          {stage.value}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Timeline Charts */}
-      {timelineData.length > 0 && (
-        <>
-          <Card>
-            <CardHeader>
-              <CardTitle>Evolução de Atividades</CardTitle>
-              <CardDescription>Acompanhe a evolução diária de convites, conexões e mensagens</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <ChartContainer
-                config={{
-                  invitations: {
-                    label: 'Convites',
-                    color: 'hsl(var(--chart-1))',
-                  },
-                  connections: {
-                    label: 'Conexões',
-                    color: 'hsl(var(--chart-2))',
-                  },
-                  messages: {
-                    label: 'Mensagens',
-                    color: 'hsl(var(--chart-3))',
-                  },
-                }}
-                className="h-[300px]"
-              >
-                <AreaChart data={timelineData}>
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                  <XAxis 
-                    dataKey="date" 
-                    className="text-xs"
-                    tickFormatter={(value) => new Date(value).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}
-                  />
-                  <YAxis className="text-xs" />
-                  <ChartTooltip content={<ChartTooltipContent />} />
-                  <Area 
-                    type="monotone" 
-                    dataKey="invitations" 
-                    stackId="1"
-                    stroke="hsl(var(--chart-1))" 
-                    fill="hsl(var(--chart-1))"
-                    fillOpacity={0.6}
-                  />
-                  <Area 
-                    type="monotone" 
-                    dataKey="connections" 
-                    stackId="2"
-                    stroke="hsl(var(--chart-2))" 
-                    fill="hsl(var(--chart-2))"
-                    fillOpacity={0.6}
-                  />
-                  <Area 
-                    type="monotone" 
-                    dataKey="messages" 
-                    stackId="3"
-                    stroke="hsl(var(--chart-3))" 
-                    fill="hsl(var(--chart-3))"
-                    fillOpacity={0.6}
-                  />
-                </AreaChart>
-              </ChartContainer>
-            </CardContent>
-          </Card>
-
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Convites vs Conexões</CardTitle>
-                <CardDescription>Compare convites enviados com conexões aceitas</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ChartContainer
-                  config={{
-                    invitations: {
-                      label: 'Convites',
-                      color: 'hsl(var(--chart-1))',
-                    },
-                    connections: {
-                      label: 'Conexões',
-                      color: 'hsl(var(--chart-2))',
-                    },
-                  }}
-                  className="h-[250px]"
-                >
-                  <LineChart data={timelineData}>
-                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                    <XAxis 
-                      dataKey="date" 
-                      className="text-xs"
-                      tickFormatter={(value) => new Date(value).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}
-                    />
-                    <YAxis className="text-xs" />
-                    <ChartTooltip content={<ChartTooltipContent />} />
-                    <Line 
-                      type="monotone" 
-                      dataKey="invitations" 
-                      stroke="hsl(var(--chart-1))" 
-                      strokeWidth={2}
-                      dot={{ fill: 'hsl(var(--chart-1))' }}
-                    />
-                    <Line 
-                      type="monotone" 
-                      dataKey="connections" 
-                      stroke="hsl(var(--chart-2))" 
-                      strokeWidth={2}
-                      dot={{ fill: 'hsl(var(--chart-2))' }}
-                    />
-                  </LineChart>
-                </ChartContainer>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Atividade Diária</CardTitle>
-                <CardDescription>Volume de atividades por dia</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ChartContainer
-                  config={{
-                    visits: {
-                      label: 'Visitas',
-                      color: 'hsl(var(--chart-4))',
-                    },
-                  }}
-                  className="h-[250px]"
-                >
-                  <BarChart data={timelineData}>
-                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                    <XAxis 
-                      dataKey="date" 
-                      className="text-xs"
-                      tickFormatter={(value) => new Date(value).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}
-                    />
-                    <YAxis className="text-xs" />
-                    <ChartTooltip content={<ChartTooltipContent />} />
-                    <Bar 
-                      dataKey="visits" 
-                      fill="hsl(var(--chart-4))"
-                      radius={[4, 4, 0, 0]}
-                    />
-                  </BarChart>
-                </ChartContainer>
-              </CardContent>
-            </Card>
-          </div>
-        </>
-      )}
-
-      {timelineData.length === 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Métricas por Período</CardTitle>
-            <CardDescription>Visualize o desempenho diário e semanal das campanhas</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground text-center py-8">
-              Importe dados de campanhas para visualizar métricas detalhadas
+      {selectedCampaigns.length < 2 && (
+        <Card className="border-yellow-500/50 bg-yellow-500/10">
+          <CardContent className="pt-6">
+            <p className="text-sm text-yellow-600 dark:text-yellow-400">
+              Selecione pelo menos 2 campanhas para visualizar os comparativos.
             </p>
           </CardContent>
         </Card>
       )}
+
+      {selectedCampaigns.length >= 2 && (
+        <>
+          {/* Gráfico de Convites Enviados */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Convites Enviados por Semana</CardTitle>
+              <CardDescription>Comparação de volume de convites enviados</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ChartContainer
+                config={selectedCampaigns.reduce((acc, campaign, idx) => ({
+                  ...acc,
+                  [`${campaign}_convites`]: {
+                    label: campaign,
+                    color: chartColors[idx]
+                  }
+                }), {})}
+                className="h-[300px]"
+              >
+                <LineChart data={comparisonData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="week" />
+                  <YAxis />
+                  <ChartTooltip content={<ChartTooltipContent />} />
+                  <Legend />
+                  {selectedCampaigns.map((campaign, idx) => (
+                    <Line
+                      key={campaign}
+                      type="monotone"
+                      dataKey={`${campaign}_convites`}
+                      stroke={chartColors[idx]}
+                      name={campaign}
+                      strokeWidth={2}
+                    />
+                  ))}
+                </LineChart>
+              </ChartContainer>
+            </CardContent>
+          </Card>
+
+          {/* Gráfico de Conexões Realizadas */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Conexões Realizadas por Semana</CardTitle>
+              <CardDescription>Comparação de conexões aceitas</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ChartContainer
+                config={selectedCampaigns.reduce((acc, campaign, idx) => ({
+                  ...acc,
+                  [`${campaign}_conexoes`]: {
+                    label: campaign,
+                    color: chartColors[idx]
+                  }
+                }), {})}
+                className="h-[300px]"
+              >
+                <BarChart data={comparisonData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="week" />
+                  <YAxis />
+                  <ChartTooltip content={<ChartTooltipContent />} />
+                  <Legend />
+                  {selectedCampaigns.map((campaign, idx) => (
+                    <Bar
+                      key={campaign}
+                      dataKey={`${campaign}_conexoes`}
+                      fill={chartColors[idx]}
+                      name={campaign}
+                    />
+                  ))}
+                </BarChart>
+              </ChartContainer>
+            </CardContent>
+          </Card>
+
+          {/* Gráfico de Mensagens Enviadas */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Mensagens Enviadas por Semana</CardTitle>
+              <CardDescription>Volume de mensagens enviadas</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ChartContainer
+                config={selectedCampaigns.reduce((acc, campaign, idx) => ({
+                  ...acc,
+                  [`${campaign}_mensagens`]: {
+                    label: campaign,
+                    color: chartColors[idx]
+                  }
+                }), {})}
+                className="h-[300px]"
+              >
+                <LineChart data={comparisonData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="week" />
+                  <YAxis />
+                  <ChartTooltip content={<ChartTooltipContent />} />
+                  <Legend />
+                  {selectedCampaigns.map((campaign, idx) => (
+                    <Line
+                      key={campaign}
+                      type="monotone"
+                      dataKey={`${campaign}_mensagens`}
+                      stroke={chartColors[idx]}
+                      name={campaign}
+                      strokeWidth={2}
+                    />
+                  ))}
+                </LineChart>
+              </ChartContainer>
+            </CardContent>
+          </Card>
+
+          {/* Gráfico de Respostas Positivas e Reuniões */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Respostas Positivas e Reuniões por Semana</CardTitle>
+              <CardDescription>Comparação de conversão (respostas e reuniões)</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ChartContainer
+                config={selectedCampaigns.reduce((acc, campaign, idx) => ({
+                  ...acc,
+                  [`${campaign}_respostas`]: {
+                    label: `${campaign} - Respostas`,
+                    color: chartColors[idx]
+                  },
+                  [`${campaign}_reunioes`]: {
+                    label: `${campaign} - Reuniões`,
+                    color: chartColors[idx]
+                  }
+                }), {})}
+                className="h-[300px]"
+              >
+                <BarChart data={comparisonData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="week" />
+                  <YAxis />
+                  <ChartTooltip content={<ChartTooltipContent />} />
+                  <Legend />
+                  {selectedCampaigns.map((campaign, idx) => (
+                    <>
+                      <Bar
+                        key={`${campaign}_respostas`}
+                        dataKey={`${campaign}_respostas`}
+                        fill={chartColors[idx]}
+                        name={`${campaign} - Respostas`}
+                      />
+                      <Bar
+                        key={`${campaign}_reunioes`}
+                        dataKey={`${campaign}_reunioes`}
+                        fill={chartColors[idx]}
+                        fillOpacity={0.6}
+                        name={`${campaign} - Reuniões`}
+                      />
+                    </>
+                  ))}
+                </BarChart>
+              </ChartContainer>
+            </CardContent>
+          </Card>
+
+          {/* Tabela de Resumo Comparativo */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Resumo Comparativo Total</CardTitle>
+              <CardDescription>Totais acumulados por campanha</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b">
+                      <th className="text-left p-2">Campanha</th>
+                      <th className="text-center p-2">Convites</th>
+                      <th className="text-center p-2">Conexões</th>
+                      <th className="text-center p-2">Mensagens</th>
+                      <th className="text-center p-2">Respostas</th>
+                      <th className="text-center p-2">Reuniões</th>
+                      <th className="text-center p-2">Taxa Aceite</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {selectedCampaigns.map((campaign) => {
+                      const totals = weeklyData[campaign]?.reduce((acc, week) => ({
+                        convites: acc.convites + week.convitesEnviados,
+                        conexoes: acc.conexoes + week.conexoesRealizadas,
+                        mensagens: acc.mensagens + week.mensagensEnviadas,
+                        respostas: acc.respostas + week.respostasPositivas,
+                        reunioes: acc.reunioes + week.reunioes
+                      }), { convites: 0, conexoes: 0, mensagens: 0, respostas: 0, reunioes: 0 });
+
+                      const taxaAceite = totals && totals.convites > 0 
+                        ? ((totals.conexoes / totals.convites) * 100).toFixed(1)
+                        : '0';
+
+                      return (
+                        <tr key={campaign} className="border-b">
+                          <td className="p-2 font-medium">{campaign}</td>
+                          <td className="text-center p-2">{totals?.convites || 0}</td>
+                          <td className="text-center p-2">{totals?.conexoes || 0}</td>
+                          <td className="text-center p-2">{totals?.mensagens || 0}</td>
+                          <td className="text-center p-2">{totals?.respostas || 0}</td>
+                          <td className="text-center p-2">{totals?.reunioes || 0}</td>
+                          <td className="text-center p-2">{taxaAceite}%</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
+        </>
+      )}
     </div>
   );
-};
-
-export default Analytics;
+}
