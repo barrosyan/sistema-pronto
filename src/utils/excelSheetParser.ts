@@ -114,16 +114,24 @@ function extractMetricsFromSheet(
   // Extract headers
   const headers = rawData[headerRowIndex].map((h: any) => String(h || '').trim());
   
-  // Find column indices
-  const eventTypeCol = headers.findIndex(h => 
-    h.toLowerCase().includes('event type') || h.toLowerCase().includes('tipo de evento')
-  );
-  const profileCol = headers.findIndex(h => 
-    h.toLowerCase().includes('profile name') || h.toLowerCase() === 'perfil'
-  );
-  const totalCol = headers.findIndex(h => 
-    h.toLowerCase().includes('total count') || h.toLowerCase() === 'total'
-  );
+  // Find column indices with safe toLowerCase
+  const eventTypeCol = headers.findIndex(h => {
+    if (!h || typeof h !== 'string') return false;
+    const lower = h.toLowerCase();
+    return lower.includes('event type') || lower.includes('tipo de evento');
+  });
+  
+  const profileCol = headers.findIndex(h => {
+    if (!h || typeof h !== 'string') return false;
+    const lower = h.toLowerCase();
+    return lower.includes('profile name') || lower === 'perfil';
+  });
+  
+  const totalCol = headers.findIndex(h => {
+    if (!h || typeof h !== 'string') return false;
+    const lower = h.toLowerCase();
+    return lower.includes('total count') || lower === 'total';
+  });
   
   if (eventTypeCol === -1 || profileCol === -1) {
     console.log(`Colunas necessárias não encontradas na aba ${campaignName}`);
@@ -133,7 +141,7 @@ function extractMetricsFromSheet(
   // Find date columns (formato YYYY-MM-DD)
   const dateColumns: { index: number; date: string }[] = [];
   headers.forEach((header, index) => {
-    if (header.match(/^\d{4}-\d{2}-\d{2}$/)) {
+    if (header && typeof header === 'string' && header.match(/^\d{4}-\d{2}-\d{2}$/)) {
       dateColumns.push({ index, date: header });
     }
   });
