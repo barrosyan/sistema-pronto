@@ -361,7 +361,42 @@ export default function UserSettings() {
         if (parsedData.campaignMetrics.length > 0) {
           console.log('Processando métricas:', parsedData.campaignMetrics.length);
           
-          const metricsToInsert = parsedData.campaignMetrics.map(metric => ({
+          // Deduplicate and consolidate metrics with the same key
+          const metricsMap = new Map<string, typeof parsedData.campaignMetrics[0]>();
+          
+          parsedData.campaignMetrics.forEach(metric => {
+            const key = `${metric.campaignName}|${metric.eventType}|${metric.profileName}`;
+            
+            if (metricsMap.has(key)) {
+              // Consolidate: merge daily data
+              const existing = metricsMap.get(key)!;
+              const mergedDailyData = { ...existing.dailyData };
+              
+              Object.entries(metric.dailyData).forEach(([date, value]) => {
+                mergedDailyData[date] = (mergedDailyData[date] || 0) + (typeof value === 'number' ? value : 0);
+              });
+              
+              const mergedTotalCount = Object.values(mergedDailyData).reduce((sum: number, val) => {
+                const numVal = typeof val === 'number' ? val : 0;
+                return sum + numVal;
+              }, 0);
+              
+              metricsMap.set(key, {
+                ...existing,
+                dailyData: mergedDailyData,
+                totalCount: mergedTotalCount
+              });
+              
+              console.log(`Métricas consolidadas para: ${key}`);
+            } else {
+              metricsMap.set(key, metric);
+            }
+          });
+          
+          const uniqueMetrics = Array.from(metricsMap.values());
+          console.log(`Métricas após deduplicação: ${uniqueMetrics.length} (original: ${parsedData.campaignMetrics.length})`);
+          
+          const metricsToInsert = uniqueMetrics.map(metric => ({
             user_id: user.id,
             campaign_name: metric.campaignName,
             event_type: metric.eventType,
@@ -382,7 +417,7 @@ export default function UserSettings() {
             throw metricsError;
           }
           console.log('Métricas inseridas/atualizadas com sucesso');
-          totalMetrics += parsedData.campaignMetrics.length;
+          totalMetrics += uniqueMetrics.length;
         }
 
 
