@@ -79,6 +79,197 @@ function extractCampaignDetailsFromSheet(sheet: XLSX.WorkSheet): { details: Camp
   };
 }
 
+// Mapeamento de nomes de métricas em português para event types
+const metricNameMapping: Record<string, string> = {
+  'convites enviados': 'Connection Requests Sent',
+  'invites': 'Connection Requests Sent',
+  'conexões realizadas': 'Connection Requests Accepted',
+  'aceite': 'Connection Requests Accepted',
+  'mensagens enviadas': 'Messages Sent',
+  'fu 1': 'Messages Sent', // Follow-up 1
+  'fu 2': 'Messages Sent', // Follow-up 2
+  'fu 3': 'Messages Sent', // Follow-up 3
+  'visitas': 'Profile Visits',
+  'likes': 'Post Likes',
+  'comentários': 'Comments Done',
+  'respostas positivas': 'Positive Responses',
+  'reuniões marcadas': 'Meetings Scheduled',
+  'leads processados': 'Leads Processed',
+};
+
+// Helper function to normalize metric names
+function normalizeMetricName(name: string): string | null {
+  const normalized = name.toLowerCase().trim();
+  return metricNameMapping[normalized] || null;
+}
+
+// Helper function to parse date from DD/MM/YYYY to YYYY-MM-DD
+function parseDateDDMMYYYY(dateStr: string): string | null {
+  if (!dateStr || typeof dateStr !== 'string') return null;
+  const match = dateStr.match(/(\d{2})\/(\d{2})\/(\d{4})/);
+  if (match) {
+    const [, day, month, year] = match;
+    return `${year}-${month}-${day}`;
+  }
+  return null;
+}
+
+// Extract weekly metrics from campaign sheets (non-daily format)
+function extractWeeklyMetricsFromSheet(
+  sheet: XLSX.WorkSheet,
+  campaignName: string,
+  profileName: string
+): CampaignMetrics[] {
+  const metrics: CampaignMetrics[] = [];
+  const rawData = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as any[][];
+  
+  // Find "Tipo do dado / Período" row
+  let headerRowIndex = -1;
+  for (let i = 0; i < rawData.length; i++) {
+    const row = rawData[i];
+    if (row && row[0] && String(row[0]).toLowerCase().includes('tipo do dado')) {
+      headerRowIndex = i;
+      break;
+    }
+  }
+  
+  if (headerRowIndex === -1) {
+    console.log(`Formato semanal não encontrado na aba ${campaignName}`);
+    return metrics;
+  }
+  
+  // Get week headers (1ª Semana, 2ª Semana, etc.)
+  const weekHeaders = rawData[headerRowIndex].slice(1);
+  
+  // Find "Início do Período" row to get start dates
+  const startDateRow = rawData[headerRowIndex + 1];
+  const startDates = startDateRow ? startDateRow.slice(1) : [];
+  
+  // Process metric rows (starting after date rows)
+  for (let i = headerRowIndex + 3; i < rawData.length; i++) {
+    const row = rawData[i];
+    if (!row || !row[0]) continue;
+    
+    const metricLabel = String(row[0]).trim();
+    if (!metricLabel) continue;
+    
+    // Skip non-metric rows
+    if (metricLabel.toLowerCase().includes('taxas de conversão') ||
+        metricLabel.toLowerCase().includes('detalhamento') ||
+        metricLabel.toLowerCase().includes('observações')) {
+      break;
+    }
+    
+    const eventType = normalizeMetricName(metricLabel);
+    if (!eventType) continue;
+    
+    // Build daily data from weekly values
+    const dailyData: Record<string, number> = {};
+    for (let weekIdx = 0; weekIdx < weekHeaders.length; weekIdx++) {
+      const value = row[weekIdx + 1];
+      const startDate = startDates[weekIdx];
+      
+      if (startDate) {
+        const parsedDate = parseDateDDMMYYYY(String(startDate));
+        if (parsedDate) {
+          dailyData[parsedDate] = Number(value) || 0;
+        }
+      }
+    }
+    
+    const totalCount = Object.values(dailyData).reduce((sum, val) => sum + val, 0);
+    
+    metrics.push({
+      campaignName,
+      eventType,
+      profileName,
+      totalCount,
+      dailyData,
+    });
+  }
+  
+  console.log(`Extraídas ${metrics.length} métricas semanais da aba ${campaignName}`);
+  return metrics;
+}
+
+// Extract daily metrics from "Diário [NAME]" sheets
+function extractDailyMetricsFromSheet(
+  sheet: XLSX.WorkSheet,
+  campaignName: string,
+  profileName: string
+): CampaignMetrics[] {
+  const metrics: CampaignMetrics[] = [];
+  const rawData = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as any[][];
+  
+  // Track metrics across all weeks
+  const metricAccumulator: Map<string, Record<string, number>> = new Map();
+  
+  // Find all "Semana X" blocks
+  for (let i = 0; i < rawData.length; i++) {
+    const row = rawData[i];
+    if (!row || !row[0]) continue;
+    
+    const cellValue = String(row[0]).toLowerCase().trim();
+    
+    // Check if this is a week header
+    if (cellValue.startsWith('semana ')) {
+      // Next row should be "Dias da Semana" with dates
+      const dateRow = rawData[i + 1];
+      if (!dateRow || String(dateRow[0]).toLowerCase() !== 'dias da semana') continue;
+      
+      const dates = dateRow.slice(1, 8); // 7 days
+      const parsedDates = dates.map((d: any) => parseDateDDMMYYYY(String(d))).filter(Boolean);
+      
+      // Process metric rows for this week
+      for (let j = i + 3; j < i + 20 && j < rawData.length; j++) {
+        const metricRow = rawData[j];
+        if (!metricRow || !metricRow[0]) continue;
+        
+        const metricLabel = String(metricRow[0]).trim();
+        if (!metricLabel) continue;
+        
+        // Check if we've hit the next week
+        if (metricLabel.toLowerCase().startsWith('semana ')) break;
+        
+        const eventType = normalizeMetricName(metricLabel);
+        if (!eventType) continue;
+        
+        // Initialize accumulator for this metric if needed
+        if (!metricAccumulator.has(eventType)) {
+          metricAccumulator.set(eventType, {});
+        }
+        
+        const dailyData = metricAccumulator.get(eventType)!;
+        
+        // Add daily values
+        for (let dayIdx = 0; dayIdx < parsedDates.length; dayIdx++) {
+          const date = parsedDates[dayIdx];
+          const value = Number(metricRow[dayIdx + 1]) || 0;
+          if (date) {
+            dailyData[date] = (dailyData[date] || 0) + value;
+          }
+        }
+      }
+    }
+  }
+  
+  // Convert accumulated metrics to CampaignMetrics array
+  for (const [eventType, dailyData] of metricAccumulator.entries()) {
+    const totalCount = Object.values(dailyData).reduce((sum, val) => sum + val, 0);
+    
+    metrics.push({
+      campaignName,
+      eventType,
+      profileName,
+      totalCount,
+      dailyData,
+    });
+  }
+  
+  console.log(`Extraídas ${metrics.length} métricas diárias da aba ${campaignName}`);
+  return metrics;
+}
+
 // Helper function to extract metrics from a sheet, optionally starting after campaign details
 function extractMetricsFromSheet(
   sheet: XLSX.WorkSheet, 
@@ -268,7 +459,7 @@ export async function parseExcelSheets(file: File | string): Promise<ExcelSheetD
     }
     
     // Parse individual campaign sheets ([NAME] format)
-    // These sheets typically have "Dados da campanha" section and daily metrics
+    // These sheets typically have "Dados da campanha" section and weekly metrics
     else if (!normalizedName.includes('diário') && 
              !normalizedName.includes('positivo') && 
              !normalizedName.includes('negativo') &&
@@ -277,32 +468,46 @@ export async function parseExcelSheets(file: File | string): Promise<ExcelSheetD
       
       console.log(`Processando aba de campanha individual: ${sheetName}`);
       
-      // First, check if this sheet has campaign details to get the end row
+      // First, extract campaign details
       const { details: sheetDetails, endRow } = extractCampaignDetailsFromSheet(sheet);
-      const startRow = sheetDetails ? endRow : 0;
       
-      // Extract metrics from this sheet starting after the details section
-      const metrics = extractMetricsFromSheet(sheet, sheetName, startRow);
-      if (metrics.length > 0) {
-        console.log(`Adicionadas ${metrics.length} métricas da aba ${sheetName}`);
-        campaignMetrics.push(...metrics);
+      if (sheetDetails) {
+        const profileName = sheetDetails.profile || 'Unknown';
+        
+        // Try to extract weekly metrics from this sheet
+        const weeklyMetrics = extractWeeklyMetricsFromSheet(sheet, sheetName, profileName);
+        if (weeklyMetrics.length > 0) {
+          console.log(`Adicionadas ${weeklyMetrics.length} métricas semanais da aba ${sheetName}`);
+          campaignMetrics.push(...weeklyMetrics);
+        } else {
+          // Fallback: try standard metric extraction
+          const metrics = extractMetricsFromSheet(sheet, sheetName, endRow);
+          if (metrics.length > 0) {
+            console.log(`Adicionadas ${metrics.length} métricas (fallback) da aba ${sheetName}`);
+            campaignMetrics.push(...metrics);
+          }
+        }
       } else {
-        console.log(`Nenhuma métrica encontrada na aba ${sheetName}`);
+        console.log(`Nenhum detalhe de campanha encontrado na aba ${sheetName}`);
       }
     }
     
-    // Parse "Diário [NAME]" sheets - daily campaign data
+    // Parse "Diário [NAME]" sheets - daily campaign data organized by week
     else if (normalizedName.includes('diário')) {
       console.log(`Processando aba diária: ${sheetName}`);
       const campaignName = sheetName.replace(/diário\s*/i, '').trim();
       
-      // Extract metrics from this daily sheet
-      const metrics = extractMetricsFromSheet(sheet, campaignName);
-      if (metrics.length > 0) {
-        console.log(`Adicionadas ${metrics.length} métricas da aba diária ${sheetName}`);
-        campaignMetrics.push(...metrics);
+      // Extract campaign details to get profile name
+      const { details: sheetDetails } = extractCampaignDetailsFromSheet(sheet);
+      const profileName = sheetDetails?.profile || 'Unknown';
+      
+      // Extract daily metrics organized by week
+      const dailyMetrics = extractDailyMetricsFromSheet(sheet, campaignName, profileName);
+      if (dailyMetrics.length > 0) {
+        console.log(`Adicionadas ${dailyMetrics.length} métricas diárias da aba ${sheetName}`);
+        campaignMetrics.push(...dailyMetrics);
       } else {
-        console.log(`Nenhuma métrica encontrada na aba diária ${sheetName}`);
+        console.log(`Nenhuma métrica diária encontrada na aba ${sheetName}`);
       }
     }
     
