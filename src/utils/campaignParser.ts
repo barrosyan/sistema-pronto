@@ -424,6 +424,7 @@ function processCampaignData(data: any[]): ParsedCampaignData {
           position: normalizeAndValidate(row['Cargo']),
           company: normalizeAndValidate(row['Empresa']),
           status: isPositive ? ('pending' as const) : ('negative' as const), // Leads importados via CSV começam como Pendente
+          source: 'Kontax',
         };
         
         if (isPositive) {
