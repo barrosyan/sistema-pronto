@@ -451,6 +451,125 @@ function parseDailyMetricsFromDiarioSheet(
   return metrics;
 }
 
+// Parsear aba Inputs (métricas diárias por campanha/perfil/evento)
+function parseInputsSheet(data: any[], campaignNameConsolidation: Set<string>): CampaignMetrics[] {
+  const metrics: CampaignMetrics[] = [];
+  if (!data || data.length < 2) return metrics;
+  
+  for (let i = 0; i < data.length; i++) {
+    const row = data[i];
+    if (!row) continue;
+    
+    const campaignName = normalizeCampaignName(
+      String(row['Campaign Name'] || row['Campanha'] || '').trim(),
+      campaignNameConsolidation
+    );
+    const eventType = String(row['Event Type'] || row['Tipo de Evento'] || '').trim();
+    const profileName = String(row['Profile Name'] || row['Perfil'] || '').trim();
+    
+    if (!campaignName || !eventType || !profileName || shouldIgnoreCampaign(campaignName)) continue;
+    
+    campaignNameConsolidation.add(campaignName);
+    
+    const dailyData: Record<string, number> = {};
+    let totalCount = 0;
+    
+    // Processar colunas de data (formato YYYY-MM-DD)
+    Object.keys(row).forEach(key => {
+      if (key.match(/^\d{4}-\d{2}-\d{2}$/)) {
+        const value = row[key];
+        const count = typeof value === 'number' ? value : (value ? parseInt(String(value)) || 0 : 0);
+        if (count > 0) {
+          dailyData[key] = count;
+          totalCount += count;
+        }
+      }
+    });
+    
+    if (totalCount > 0) {
+      metrics.push({
+        campaignName,
+        eventType,
+        profileName,
+        totalCount,
+        dailyData
+      });
+    }
+  }
+  
+  return metrics;
+}
+
+// Parsear aba Compilado (dados agregados semanais)
+function parseCompiladoSheet(data: any[], campaignNameConsolidation: Set<string>): CampaignMetrics[] {
+  const metrics: CampaignMetrics[] = [];
+  if (!data || data.length < 2) return metrics;
+  
+  // Encontrar linha "Campanhas Ativas" que contém os nomes das campanhas por semana
+  let campaignsRow: any = null;
+  for (let i = 0; i < data.length; i++) {
+    const row = data[i];
+    const firstCol = String(row['__EMPTY'] || row['A'] || row[Object.keys(row)[0]] || '').toLowerCase();
+    if (firstCol.includes('campanhas ativas')) {
+      campaignsRow = row;
+      break;
+    }
+  }
+  
+  if (!campaignsRow) return metrics;
+  
+  // Extrair nomes de campanhas (separadas por vírgula)
+  const weekKeys = Object.keys(campaignsRow).filter(k => k !== '__EMPTY' && k !== 'A');
+  const campaignsByWeek: Record<string, string[]> = {};
+  
+  weekKeys.forEach(key => {
+    const campaignsStr = String(campaignsRow[key] || '');
+    if (campaignsStr) {
+      const campaigns = campaignsStr.split(',').map(c => {
+        const normalized = normalizeCampaignName(c.trim(), campaignNameConsolidation);
+        if (!shouldIgnoreCampaign(normalized)) {
+          campaignNameConsolidation.add(normalized);
+          return normalized;
+        }
+        return null;
+      }).filter(Boolean) as string[];
+      
+      campaignsByWeek[key] = campaigns;
+    }
+  });
+  
+  return metrics;
+}
+
+// Parsear aba Dados Gerais (comparativo entre campanhas)
+function parseDadosGeraisSheet(data: any[], campaignNameConsolidation: Set<string>): CampaignMetrics[] {
+  const metrics: CampaignMetrics[] = [];
+  if (!data || data.length < 2) return metrics;
+  
+  // A primeira linha contém os nomes das campanhas (cada coluna é uma campanha)
+  const headerRow = data[0];
+  if (!headerRow) return metrics;
+  
+  const campaignColumns: { key: string; campaignName: string }[] = [];
+  
+  Object.keys(headerRow).forEach(key => {
+    if (key === '__EMPTY' || key === 'A') return; // Pular primeira coluna (labels)
+    
+    const campaignName = normalizeCampaignName(
+      String(headerRow[key] || '').trim(),
+      campaignNameConsolidation
+    );
+    
+    if (campaignName && !shouldIgnoreCampaign(campaignName)) {
+      campaignNameConsolidation.add(campaignName);
+      campaignColumns.push({ key, campaignName });
+    }
+  });
+  
+  return metrics;
+}
+
+
 // Parsear leads positivos
 function parsePositiveLeads(data: any[]): Lead[] {
   const leads: Lead[] = [];
@@ -563,18 +682,43 @@ export function parseExcelFile(file: File): Promise<ExcelSheetData> {
           const sheetData = XLSX.utils.sheet_to_json(sheet);
           const normalizedName = sheetName.toLowerCase().trim();
           
+          // Processar Leads Positivos
           if (normalizedName.includes('leads positivos')) {
             result.positiveLeads = parsePositiveLeads(sheetData);
             return;
           }
           
+          // Processar Leads Negativos
           if (normalizedName.includes('leads negativos')) {
             result.negativeLeads = parseNegativeLeads(sheetData);
             return;
           }
           
+          // Processar aba Inputs (métricas diárias)
+          if (normalizedName.includes('inputs')) {
+            const inputsMetrics = parseInputsSheet(sheetData, campaignNameConsolidation);
+            result.campaignMetrics.push(...inputsMetrics);
+            return;
+          }
+          
+          // Processar aba Compilado (dados consolidados)
+          if (normalizedName.includes('compilado')) {
+            const compiladoMetrics = parseCompiladoSheet(sheetData, campaignNameConsolidation);
+            result.campaignMetrics.push(...compiladoMetrics);
+            return;
+          }
+          
+          // Processar aba Dados Gerais (comparativo de campanhas)
+          if (normalizedName.includes('dados gerais')) {
+            const dadosGeraisMetrics = parseDadosGeraisSheet(sheetData, campaignNameConsolidation);
+            result.campaignMetrics.push(...dadosGeraisMetrics);
+            return;
+          }
+          
+          // Outras abas fixas (ignorar)
           if (isFixedSheet(sheetName)) return;
           
+          // Processar abas de campanha individual
           const campaignHeader = extractCampaignHeader(sheetData);
           if (!campaignHeader || !campaignHeader.campaignName) return;
           
