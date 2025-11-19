@@ -163,7 +163,10 @@ function shouldIgnoreCampaign(campaignName: string): boolean {
 
 // Helper function to extract campaign header info from the beginning of a campaign sheet
 function extractCampaignHeader(data: any[]): any {
-  if (!data || data.length < 6) return null;
+  if (!data || data.length < 6) {
+    console.log('Dados insuficientes para extrair header');
+    return null;
+  }
   
   const header: any = {
     company: '',
@@ -174,38 +177,69 @@ function extractCampaignHeader(data: any[]): any {
     jobTitles: ''
   };
   
-  // Extract header fields from first rows (typically first 6 rows)
+  console.log('Primeiras 10 linhas dos dados para debug:', data.slice(0, 10));
+  
+  // Extract header fields from first rows (typically first 7-8 rows)
   for (let i = 0; i < Math.min(data.length, 10); i++) {
     const row = data[i];
     if (!row || typeof row !== 'object') continue;
     
-    // Try different ways to access the first two columns
+    // Get all possible keys for the row
     const keys = Object.keys(row);
-    const firstValue = row[keys[0]];
-    const secondValue = row[keys[1]];
+    console.log(`Linha ${i} - Keys:`, keys);
+    
+    // Try to access first and second columns with different possible keys
+    let firstValue = null;
+    let secondValue = null;
+    
+    // Try common patterns for first column
+    if (row['__EMPTY']) firstValue = row['__EMPTY'];
+    else if (row['A']) firstValue = row['A'];
+    else if (keys[0]) firstValue = row[keys[0]];
+    
+    // Try common patterns for second column
+    if (row['__EMPTY_1']) secondValue = row['__EMPTY_1'];
+    else if (row['B']) secondValue = row['B'];
+    else if (keys[1]) secondValue = row[keys[1]];
+    
+    console.log(`Linha ${i} - Primeira coluna: "${firstValue}" | Segunda coluna: "${secondValue}"`);
     
     if (!firstValue || !secondValue) continue;
     
     const label = String(firstValue).toLowerCase().trim();
     const value = String(secondValue).trim();
     
+    console.log(`Linha ${i} - Label: "${label}" | Value: "${value}"`);
+    
     if (label.includes('empresa') || label.includes('company')) {
       header.company = value;
+      console.log('✓ Empresa encontrada:', value);
     } else if (label.includes('perfil') || label.includes('profile')) {
       header.profileName = value;
-    } else if (label.includes('campanha') && !label.includes('objetivo')) {
+      console.log('✓ Perfil encontrado:', value);
+    } else if ((label.includes('campanha') || label.includes('campaign')) && !label.includes('objetivo')) {
       header.campaignName = value;
-    } else if (label.includes('objetivo')) {
+      console.log('✓ Nome da campanha encontrado:', value);
+    } else if (label.includes('objetivo') || label.includes('objective')) {
       header.objective = value;
+      console.log('✓ Objetivo encontrado:', value);
     } else if (label.includes('cadência') || label.includes('cadence')) {
       header.cadence = value;
-    } else if (label.includes('cargos')) {
+      console.log('✓ Cadência encontrada:', value);
+    } else if (label.includes('cargos') || label.includes('job')) {
       header.jobTitles = value;
+      console.log('✓ Cargos encontrados:', value);
     }
   }
   
-  console.log('Header extraído:', header);
-  return header.campaignName ? header : null;
+  console.log('Header final extraído:', header);
+  
+  if (!header.campaignName) {
+    console.log('❌ ERRO: Nome da campanha não foi encontrado no header!');
+    return null;
+  }
+  
+  return header;
 }
 
 // Função para encontrar índice da linha de métricas
@@ -226,10 +260,18 @@ function parseWeeklyMetrics(data: any[], campaignHeader: any, campaignNameConsol
   const metrics: CampaignMetrics[] = [];
   const startRow = findMetricsStartRow(data);
   
-  if (startRow === -1) return metrics;
+  console.log(`Procurando métricas. Start row: ${startRow}`);
+  
+  if (startRow === -1) {
+    console.log('❌ Linha de início das métricas não encontrada');
+    return metrics;
+  }
   
   const campaignName = normalizeCampaignName(campaignHeader.campaignName, campaignNameConsolidation);
-  if (shouldIgnoreCampaign(campaignName)) return metrics;
+  if (shouldIgnoreCampaign(campaignName)) {
+    console.log(`Campanha ${campaignName} está na lista de ignorados`);
+    return metrics;
+  }
   
   campaignNameConsolidation.add(campaignName);
   
@@ -244,30 +286,65 @@ function parseWeeklyMetrics(data: any[], campaignHeader: any, campaignNameConsol
     'respostas positivas': 'Positive Responses',
     'reuniões': 'Meetings',
     'propostas': 'Proposals',
-    'vendas': 'Sales'
+    'vendas': 'Sales',
+    'total de atividades': 'Total Activities',
+    'leads processados': 'Leads Processed'
   };
+  
+  console.log(`Processando métricas a partir da linha ${startRow + 1}`);
+  console.log('Amostra da linha de header:', data[startRow]);
   
   // Processar cada linha de métrica
   for (let i = startRow + 1; i < data.length; i++) {
     const row = data[i];
-    const metricName = String(row['__EMPTY'] || row['A'] || row[Object.keys(row)[0]] || '').toLowerCase().trim();
+    if (!row) break;
     
-    if (!metricName || metricName.includes('taxas de conversão') || metricName.includes('detalhamento')) break;
+    // Get all keys to understand the structure
+    const keys = Object.keys(row);
+    
+    // Try to get metric name from first column
+    let metricNameRaw = null;
+    if (row['__EMPTY']) metricNameRaw = row['__EMPTY'];
+    else if (row['A']) metricNameRaw = row['A'];
+    else if (keys[0]) metricNameRaw = row[keys[0]];
+    
+    if (!metricNameRaw) {
+      console.log(`Linha ${i}: Nome da métrica vazio, pulando`);
+      continue;
+    }
+    
+    const metricName = String(metricNameRaw).toLowerCase().trim();
+    console.log(`Linha ${i}: Métrica encontrada: "${metricName}"`);
+    
+    // Stop at conversion rates or other section markers
+    if (metricName.includes('taxas de conversão') || 
+        metricName.includes('detalhamento') ||
+        metricName.includes('observações') ||
+        metricName.includes('problemas técnicos')) {
+      console.log(`Encontrado marcador de fim de métricas: "${metricName}"`);
+      break;
+    }
     
     const eventType = metricMap[metricName];
-    if (!eventType) continue;
+    if (!eventType) {
+      console.log(`Métrica "${metricName}" não mapeada, pulando`);
+      continue;
+    }
     
-    // Extrair dados diários de cada coluna de semana
+    // Extrair dados de todas as colunas (semanas/períodos)
     const dailyData: Record<string, number> = {};
     let totalCount = 0;
     
-    // Iterar sobre as colunas (semanas)
-    Object.keys(row).forEach(key => {
-      if (key.startsWith('__EMPTY')) {
-        const value = Number(row[key]) || 0;
+    // Iterar sobre todas as keys (colunas) exceto a primeira
+    keys.slice(1).forEach((key, idx) => {
+      const value = Number(row[key]) || 0;
+      if (value > 0) {
         totalCount += value;
+        console.log(`  Coluna ${idx + 1} (${key}): ${value}`);
       }
     });
+    
+    console.log(`✓ Métrica adicionada: ${campaignName} - ${eventType} - Total: ${totalCount}`);
     
     metrics.push({
       campaignName,
@@ -278,6 +355,7 @@ function parseWeeklyMetrics(data: any[], campaignHeader: any, campaignNameConsol
     });
   }
   
+  console.log(`Total de ${metrics.length} métricas extraídas da campanha ${campaignName}`);
   return metrics;
 }
 
