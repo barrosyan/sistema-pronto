@@ -277,6 +277,8 @@ function parseWeeklyMetricsFromCampaignSheet(
   };
   
   // Processar linhas de métricas
+  console.log(`[parseWeeklyMetricsFromCampaignSheet] Processing metrics rows for ${campaignName}, starting at row ${metricsStartIndex + 3}`);
+  
   for (let rowIdx = metricsStartIndex + 3; rowIdx < data.length; rowIdx++) {
     const row = data[rowIdx];
     if (!row) continue;
@@ -286,18 +288,26 @@ function parseWeeklyMetricsFromCampaignSheet(
     if (metricLabel.includes('taxas de conversão') || 
         metricLabel.includes('detalhamento') ||
         metricLabel.includes('observações')) {
+      console.log(`[parseWeeklyMetricsFromCampaignSheet] Stopped at row ${rowIdx}: found ${metricLabel}`);
       break;
     }
     
     if (!metricLabel) continue;
     
     const eventType = metricMap[metricLabel];
-    if (!eventType) continue;
+    if (!eventType) {
+      console.log(`[parseWeeklyMetricsFromCampaignSheet] ⚠️ No mapping for metric: "${metricLabel}"`);
+      continue;
+    }
+    
+    console.log(`[parseWeeklyMetricsFromCampaignSheet] Processing ${metricLabel} -> ${eventType}`);
     
     // Processar cada semana
+    let totalForMetric = 0;
     weekColumns.forEach(({ key, weekNumber, startDate, endDate }) => {
       const value = row[key];
       const count = typeof value === 'number' ? value : (value ? parseInt(String(value)) || 0 : 0);
+      totalForMetric += count;
       
       let metric = metrics.find(m => 
         m.campaignName === campaignName && 
@@ -320,7 +330,14 @@ function parseWeeklyMetricsFromCampaignSheet(
       metric.dailyData[weekKey] = count;
       metric.totalCount += count;
     });
+    
+    console.log(`[parseWeeklyMetricsFromCampaignSheet] ${eventType}: total=${totalForMetric} across ${weekColumns.length} weeks`);
   }
+  
+  console.log(`[parseWeeklyMetricsFromCampaignSheet] Extracted ${metrics.length} metric entries for ${campaignName}`);
+  metrics.forEach(m => {
+    console.log(`  - ${m.eventType}: total=${m.totalCount}, days=${Object.keys(m.dailyData).length}`);
+  });
   
   return metrics;
 }
