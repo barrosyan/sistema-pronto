@@ -161,28 +161,51 @@ function shouldIgnoreCampaign(campaignName: string): boolean {
   return ignoredCampaigns.includes(normalized);
 }
 
-// Função para extrair cabeçalho de campanha das abas individuais
+// Helper function to extract campaign header info from the beginning of a campaign sheet
 function extractCampaignHeader(data: any[]): any {
-  const header: any = {};
+  if (!data || data.length < 6) return null;
   
-  for (let i = 0; i < Math.min(10, data.length); i++) {
+  const header: any = {
+    company: '',
+    profileName: '',
+    campaignName: '',
+    objective: '',
+    cadence: '',
+    jobTitles: ''
+  };
+  
+  // Extract header fields from first rows (typically first 6 rows)
+  for (let i = 0; i < Math.min(data.length, 10); i++) {
     const row = data[i];
-    const firstCell = row['__EMPTY'] || row['A'] || row[Object.keys(row)[0]];
-    const secondCell = row['__EMPTY_1'] || row['B'] || row[Object.keys(row)[1]];
+    if (!row || typeof row !== 'object') continue;
     
-    if (!firstCell) continue;
+    // Try different ways to access the first two columns
+    const keys = Object.keys(row);
+    const firstValue = row[keys[0]];
+    const secondValue = row[keys[1]];
     
-    const key = String(firstCell).toLowerCase().trim();
+    if (!firstValue || !secondValue) continue;
     
-    if (key.includes('empresa')) header.company = secondCell;
-    if (key.includes('perfil')) header.profileName = secondCell;
-    if (key.includes('campanha')) header.campaignName = secondCell;
-    if (key.includes('objetivo')) header.objective = secondCell;
-    if (key.includes('cadência') || key.includes('cadencia')) header.cadence = secondCell;
-    if (key.includes('cargos')) header.jobTitles = secondCell;
+    const label = String(firstValue).toLowerCase().trim();
+    const value = String(secondValue).trim();
+    
+    if (label.includes('empresa') || label.includes('company')) {
+      header.company = value;
+    } else if (label.includes('perfil') || label.includes('profile')) {
+      header.profileName = value;
+    } else if (label.includes('campanha') && !label.includes('objetivo')) {
+      header.campaignName = value;
+    } else if (label.includes('objetivo')) {
+      header.objective = value;
+    } else if (label.includes('cadência') || label.includes('cadence')) {
+      header.cadence = value;
+    } else if (label.includes('cargos')) {
+      header.jobTitles = value;
+    }
   }
   
-  return header;
+  console.log('Header extraído:', header);
+  return header.campaignName ? header : null;
 }
 
 // Função para encontrar índice da linha de métricas
@@ -720,56 +743,66 @@ export async function parseExcelSheets(file: File | string): Promise<ExcelSheetD
       });
     }
     
-    // Parse individual campaign sheets ([NAME] format)
-    // These sheets typically have "Dados da campanha" section and weekly metrics
-    else if (!normalizedName.includes('diário') && 
-             !normalizedName.includes('positivo') && 
-             !normalizedName.includes('negativo') &&
-             !normalizedName.includes('compilado') &&
-             !normalizedName.includes('dados gerais')) {
+    // Parse campaign-specific sheets (not Inputs, Leads, Compilado, or Dados Gerais)
+    else if (!isFixedSheet(sheetName)) {
+      console.log(`Processando aba de campanha: ${sheetName}`);
+      const data = XLSX.utils.sheet_to_json(sheet) as any[];
       
-      console.log(`Processando aba de campanha individual: ${sheetName}`);
-      
-      // First, extract campaign details
-      const { details: sheetDetails, endRow } = extractCampaignDetailsFromSheet(sheet);
-      
-      if (sheetDetails) {
-        const profileName = sheetDetails.profile || 'Unknown';
+      // CRÍTICO: Extrair header de DENTRO da aba, NÃO usar o nome da aba
+      const campaignHeader = extractCampaignHeader(data);
+      if (campaignHeader) {
+        console.log(`Header de campanha encontrado na aba ${sheetName}:`, campaignHeader);
+        console.log(`Nome REAL da campanha extraído de dentro da aba: ${campaignHeader.campaignName}`);
         
-        // Try to extract weekly metrics from this sheet
-        const weeklyMetrics = extractWeeklyMetricsFromSheet(sheet, sheetName, profileName);
+        // Store campaign details usando o nome de DENTRO da aba
+        const campaignDetails: CampaignDetails = {
+          company: campaignHeader.company,
+          profile: campaignHeader.profileName,
+          campaignName: campaignHeader.campaignName, // Nome de DENTRO da aba
+          objective: campaignHeader.objective,
+          cadence: campaignHeader.cadence,
+          jobTitles: campaignHeader.jobTitles
+        };
+        
+        allCampaignDetails.push(campaignDetails);
+        
+        // Extract weekly metrics usando o nome de DENTRO da aba
+        const weeklyMetrics = parseWeeklyMetrics(data, campaignHeader, campaignNameConsolidation);
         if (weeklyMetrics.length > 0) {
-          console.log(`Adicionadas ${weeklyMetrics.length} métricas semanais da aba ${sheetName}`);
+          console.log(`Adicionadas ${weeklyMetrics.length} métricas semanais da campanha ${campaignHeader.campaignName}`);
           campaignMetrics.push(...weeklyMetrics);
         } else {
-          // Fallback: try standard metric extraction
-          const metrics = extractMetricsFromSheet(sheet, sheetName, endRow);
-          if (metrics.length > 0) {
-            console.log(`Adicionadas ${metrics.length} métricas (fallback) da aba ${sheetName}`);
-            campaignMetrics.push(...metrics);
-          }
+          console.log(`Nenhuma métrica semanal encontrada para campanha ${campaignHeader.campaignName}`);
         }
       } else {
-        console.log(`Nenhum detalhe de campanha encontrado na aba ${sheetName}`);
+        console.log(`Nenhum detalhe de campanha encontrado na aba ${sheetName} - aba ignorada`);
       }
     }
     
     // Parse "Diário [NAME]" sheets - daily campaign data organized by week
     else if (normalizedName.includes('diário')) {
       console.log(`Processando aba diária: ${sheetName}`);
-      const campaignName = sheetName.replace(/diário\s*/i, '').trim();
+      const data = XLSX.utils.sheet_to_json(sheet) as any[];
       
-      // Extract campaign details to get profile name
-      const { details: sheetDetails } = extractCampaignDetailsFromSheet(sheet);
-      const profileName = sheetDetails?.profile || 'Unknown';
+      // CRÍTICO: Extrair nome da campanha de DENTRO da aba, NÃO usar o nome da aba
+      const campaignHeader = extractCampaignHeader(data);
       
-      // Extract daily metrics organized by week
-      const dailyMetrics = extractDailyMetricsFromSheet(sheet, campaignName, profileName);
-      if (dailyMetrics.length > 0) {
-        console.log(`Adicionadas ${dailyMetrics.length} métricas diárias da aba ${sheetName}`);
-        campaignMetrics.push(...dailyMetrics);
+      if (campaignHeader) {
+        const campaignName = campaignHeader.campaignName;
+        const profileName = campaignHeader.profileName;
+        
+        console.log(`Nome REAL da campanha extraído de dentro da aba diária: ${campaignName}`);
+        
+        // Extract daily metrics organized by week usando o nome de DENTRO da aba
+        const dailyMetrics = extractDailyMetricsFromSheet(sheet, campaignName, profileName);
+        if (dailyMetrics.length > 0) {
+          console.log(`Adicionadas ${dailyMetrics.length} métricas diárias da campanha ${campaignName}`);
+          campaignMetrics.push(...dailyMetrics);
+        } else {
+          console.log(`Nenhuma métrica diária encontrada para campanha ${campaignName}`);
+        }
       } else {
-        console.log(`Nenhuma métrica diária encontrada na aba ${sheetName}`);
+        console.log(`Nenhum header encontrado na aba diária ${sheetName} - aba ignorada`);
       }
     }
     
