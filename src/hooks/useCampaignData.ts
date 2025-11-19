@@ -7,6 +7,7 @@ interface CampaignDataStore {
   campaignMetrics: CampaignMetrics[];
   positiveLeads: Lead[];
   negativeLeads: Lead[];
+  pendingLeads: Lead[];
   isLoading: boolean;
   
   loadFromDatabase: () => Promise<void>;
@@ -27,6 +28,7 @@ export const useCampaignData = create<CampaignDataStore>((set, get) => ({
   campaignMetrics: [],
   positiveLeads: [],
   negativeLeads: [],
+  pendingLeads: [],
   isLoading: false,
   
   loadFromDatabase: async () => {
@@ -99,7 +101,8 @@ export const useCampaignData = create<CampaignDataStore>((set, get) => ({
       set({
         campaignMetrics: metrics,
         positiveLeads: leads.filter(l => l.status === 'positive'),
-        negativeLeads: leads.filter(l => l.status === 'negative')
+        negativeLeads: leads.filter(l => l.status === 'negative'),
+        pendingLeads: leads.filter(l => l.status === 'pending')
       });
     } catch (error) {
       console.error('Error loading data from database:', error);
