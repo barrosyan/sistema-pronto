@@ -142,50 +142,74 @@ function extractWeeklyMetricsFromSheet(
   const weekHeaders = rawData[headerRowIndex].slice(1);
   
   // Find "Início do Período" row to get start dates
-  const startDateRow = rawData[headerRowIndex + 1];
-  const startDates = startDateRow ? startDateRow.slice(1) : [];
+  const startDateRowIndex = headerRowIndex + 1;
+  const startDateRow = rawData[startDateRowIndex];
+  if (!startDateRow || String(startDateRow[0]).toLowerCase() !== 'início do período') {
+    console.log(`Linha "Início do Período" não encontrada na aba ${campaignName}`);
+    return metrics;
+  }
+  const startDates = startDateRow.slice(1);
   
-  // Process metric rows (starting after date rows)
-  for (let i = headerRowIndex + 3; i < rawData.length; i++) {
+  // Find "Fim do Período" row (optional for validation)
+  const endDateRowIndex = headerRowIndex + 2;
+  
+  // Skip "Dias Ativos" row
+  // Metrics start after this
+  const firstMetricRowIndex = headerRowIndex + 4;
+  
+  // Process metric rows
+  for (let i = firstMetricRowIndex; i < rawData.length; i++) {
     const row = rawData[i];
     if (!row || !row[0]) continue;
     
     const metricLabel = String(row[0]).trim();
     if (!metricLabel) continue;
     
-    // Skip non-metric rows
+    // Stop at "Taxas de Conversão" or similar sections
     if (metricLabel.toLowerCase().includes('taxas de conversão') ||
         metricLabel.toLowerCase().includes('detalhamento') ||
-        metricLabel.toLowerCase().includes('observações')) {
+        metricLabel.toLowerCase().includes('observações') ||
+        metricLabel.toLowerCase().includes('problemas técnicos') ||
+        metricLabel.toLowerCase().includes('ajustes na pesquisa') ||
+        metricLabel.toLowerCase().includes('análise comparativa')) {
       break;
     }
     
     const eventType = normalizeMetricName(metricLabel);
-    if (!eventType) continue;
+    if (!eventType) {
+      console.log(`Métrica não reconhecida: "${metricLabel}"`);
+      continue;
+    }
     
     // Build daily data from weekly values
     const dailyData: Record<string, number> = {};
+    let totalCount = 0;
+    
     for (let weekIdx = 0; weekIdx < weekHeaders.length; weekIdx++) {
       const value = row[weekIdx + 1];
+      const numericValue = Number(value) || 0;
       const startDate = startDates[weekIdx];
       
-      if (startDate) {
+      if (startDate && numericValue > 0) {
         const parsedDate = parseDateDDMMYYYY(String(startDate));
         if (parsedDate) {
-          dailyData[parsedDate] = Number(value) || 0;
+          dailyData[parsedDate] = numericValue;
+          totalCount += numericValue;
         }
       }
     }
     
-    const totalCount = Object.values(dailyData).reduce((sum, val) => sum + val, 0);
-    
-    metrics.push({
-      campaignName,
-      eventType,
-      profileName,
-      totalCount,
-      dailyData,
-    });
+    // Only add metric if there's actual data
+    if (totalCount > 0 || Object.keys(dailyData).length > 0) {
+      metrics.push({
+        campaignName,
+        eventType,
+        profileName,
+        totalCount,
+        dailyData,
+      });
+      console.log(`Métrica adicionada: ${campaignName} - ${eventType} - Total: ${totalCount}`);
+    }
   }
   
   console.log(`Extraídas ${metrics.length} métricas semanais da aba ${campaignName}`);
