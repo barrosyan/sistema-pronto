@@ -431,6 +431,8 @@ export async function parseExcelSheets(file: File | string): Promise<ExcelSheetD
   const positiveLeads: Lead[] = [];
   const negativeLeads: Lead[] = [];
   const allCampaignDetails: CampaignDetails[] = [];
+  const allCampaignNames = new Set<string>(); // Track all campaign names found in Dados Gerais
+  
   
   // Process each sheet based on its name pattern
   for (const sheetName of workbook.SheetNames) {
@@ -537,66 +539,64 @@ export async function parseExcelSheets(file: File | string): Promise<ExcelSheetD
     
     // Parse "Compilado" sheet - aggregated profile data AND Campanhas Ativas section
     else if (normalizedName.includes('compilado')) {
-      console.log('Processando aba Compilado para dados de perfil e Campanhas Ativas');
-      
+      console.log('Processando aba Compilado');
       const rawData = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as any[][];
       
       // Find "Campanhas Ativas" section
-      const campanhasAtivasRowIndex = rawData.findIndex(row => 
-        row && row[0] && String(row[0]).toLowerCase().includes('campanhas ativas')
+      const activeCampaignsIndex = rawData.findIndex(row => 
+        row && row.some((cell: any) => 
+          typeof cell === 'string' && cell.toLowerCase().includes('campanhas ativas')
+        )
       );
       
-      if (campanhasAtivasRowIndex !== -1) {
-        console.log(`Seção "Campanhas Ativas" encontrada na linha ${campanhasAtivasRowIndex}`);
+      if (activeCampaignsIndex !== -1) {
+        console.log('Encontrada seção Campanhas Ativas no Compilado');
         
-        // Find metrics rows after "Campanhas Ativas"
-        // Row after "Campanhas Ativas" contains campaign names
-        const campaignNamesRow = rawData[campanhasAtivasRowIndex];
-        const campaignNames: string[] = [];
-        
-        // Extract campaign names from columns (starting from column B/index 1)
-        for (let col = 1; col < campaignNamesRow.length; col++) {
-          const cellValue = campaignNamesRow[col];
-          if (cellValue && String(cellValue).trim()) {
-            campaignNames.push(String(cellValue).trim());
-          } else {
-            break; // Stop when we hit an empty cell
-          }
-        }
-        
-        console.log(`Campanhas encontradas em Campanhas Ativas:`, campaignNames);
-        
-        // Find metric rows (Dias Ativos, Convites Enviados, etc.)
-        const metricRows = [
-          { rowName: 'dias ativos', eventType: 'Active Days' },
-          { rowName: 'convites enviados', eventType: 'Connection Requests Sent' },
-          { rowName: 'conexões realizadas', eventType: 'Connection Requests Accepted' },
-          { rowName: 'taxa de aceite', eventType: 'Connection Accept Rate' },
-          { rowName: 'mensagens enviadas', eventType: 'Messages Sent' },
-          { rowName: 'visitas', eventType: 'Profile Visits' },
-          { rowName: 'likes', eventType: 'Post Likes' },
-          { rowName: 'comentários', eventType: 'Comments Done' },
-          { rowName: 'total de atividades', eventType: 'Total Activities' },
-          { rowName: 'respostas positivas', eventType: 'Positive Responses' },
-          { rowName: 'leads processados', eventType: 'Leads Processed' },
-          { rowName: 'reuniões', eventType: 'Meetings Scheduled' },
-          { rowName: 'propostas', eventType: 'Proposals' },
-          { rowName: 'vendas', eventType: 'Sales' }
-        ];
-        
-        // Process each metric row
-        metricRows.forEach(({ rowName, eventType }) => {
-          // Find the row with this metric
-          const metricRowIndex = rawData.findIndex((row, idx) => 
-            idx > campanhasAtivasRowIndex &&
-            row && row[0] && 
-            String(row[0]).toLowerCase().trim().includes(rowName)
-          );
+        // Next row should contain campaign names (possibly separated by commas)
+        const headerRow = rawData[activeCampaignsIndex + 1];
+        if (!headerRow) {
+          console.log('Linha de header de campanhas não encontrada');
+        } else {
+          // Extract campaign names, handling comma-separated campaigns
+          const campaignNames: string[] = [];
+          headerRow.slice(1).forEach((cell: any) => {
+            if (cell && typeof cell === 'string') {
+              // Split by comma and trim each campaign name
+              const campaigns = cell.split(',').map(c => c.trim()).filter(c => c.length > 0);
+              campaignNames.push(...campaigns);
+            }
+          });
           
-          if (metricRowIndex !== -1) {
-            const metricRow = rawData[metricRowIndex];
+          console.log(`Campanhas encontradas na aba Compilado: ${campaignNames.join(', ')}`);
+          
+          // Map metric labels to event types
+          const metricLabelMapping: Record<string, string> = {
+            'convites enviados': 'Connection Requests Sent',
+            'conexões realizadas': 'Connection Requests Accepted',
+            'taxa de aceite': 'Connection Accept Rate',
+            'mensagens enviadas': 'Messages Sent',
+            'visitas': 'Profile Visits',
+            'likes': 'Post Likes',
+            'comentários': 'Comments Done',
+            'total de atividades': 'Total Activities',
+            'respostas positivas': 'Positive Responses',
+            'leads processados': 'Leads Processed',
+            'reuniões': 'Meetings',
+            'propostas': 'Proposals',
+            'vendas': 'Sales',
+            'dias ativos': 'Active Days',
+          };
+          
+          // Process metric rows
+          rawData.slice(activeCampaignsIndex + 2).forEach(metricRow => {
+            if (!metricRow || !metricRow[0]) return;
             
-            // Extract values for each campaign
+            const metricLabel = String(metricRow[0]).toLowerCase().trim();
+            const eventType = metricLabelMapping[metricLabel];
+            
+            if (!eventType) return;
+            
+            // For each campaign, extract the value
             campaignNames.forEach((campaignName, idx) => {
               const value = metricRow[idx + 1]; // +1 because column 0 is the metric name
               let numericValue = Number(value) || 0;
@@ -622,8 +622,8 @@ export async function parseExcelSheets(file: File | string): Promise<ExcelSheetD
                 console.log(`Métrica adicionada de Campanhas Ativas: ${campaignName} - ${eventType}: ${numericValue}`);
               }
             });
-          }
-        });
+          });
+        }
       }
       
       // Also process regular Compilado data (if exists)
@@ -656,6 +656,50 @@ export async function parseExcelSheets(file: File | string): Promise<ExcelSheetD
     // Parse "Dados Gerais" sheet - general campaign data
     else if (normalizedName.includes('dados gerais')) {
       console.log('Processando aba Dados Gerais para campanhas');
+      const rawData = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as any[][];
+      
+      // Find "Campanhas Ativas por Semana" section
+      const weeklyActiveCampaignsIndex = rawData.findIndex(row => 
+        row && row.some((cell: any) => 
+          typeof cell === 'string' && cell.toLowerCase().includes('campanhas ativas')
+        )
+      );
+      
+      if (weeklyActiveCampaignsIndex !== -1) {
+        console.log('Encontrada seção Campanhas Ativas na aba Dados Gerais');
+        
+        // Next row should contain week headers
+        const weekHeaderRow = rawData[weeklyActiveCampaignsIndex + 1];
+        if (!weekHeaderRow) {
+          console.log('Linha de header de semanas não encontrada');
+        } else {
+          const weekHeaders = weekHeaderRow.slice(1);
+          console.log(`Semanas encontradas: ${weekHeaders.length}`);
+          
+          // Process each week row - each cell may contain comma-separated campaign names
+          for (let i = weeklyActiveCampaignsIndex + 2; i < rawData.length; i++) {
+            const weekRow = rawData[i];
+            if (!weekRow || weekRow.length === 0) break;
+            
+            // Extract campaigns from each week column
+            weekRow.slice(1).forEach((cell: any, weekIdx: number) => {
+              if (cell && typeof cell === 'string') {
+                // Split by comma and process each campaign
+                const campaigns = cell.split(',').map(c => c.trim()).filter(c => c.length > 0);
+                campaigns.forEach(campaignName => {
+                  // Track this campaign name for later processing
+                  if (!allCampaignNames.has(campaignName)) {
+                    allCampaignNames.add(campaignName);
+                    console.log(`Campanha encontrada em Dados Gerais: ${campaignName}`);
+                  }
+                });
+              }
+            });
+          }
+        }
+      }
+      
+      // Also process regular Dados Gerais data (if exists in traditional format)
       const data = XLSX.utils.sheet_to_json(sheet) as any[];
       
       data.forEach(row => {
