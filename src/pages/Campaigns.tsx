@@ -6,13 +6,15 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { format, startOfWeek, endOfWeek } from 'date-fns';
+import { format, startOfWeek, endOfWeek, isWithinInterval, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ChevronLeft, ChevronRight, Info } from 'lucide-react';
 import { CampaignDetailsDialog } from '@/components/CampaignDetailsDialog';
 import { CampaignFunnelChart } from '@/components/CampaignFunnelChart';
+import { DateRangePicker } from '@/components/DateRangePicker';
+import { DateRange } from 'react-day-picker';
 import { supabase } from '@/integrations/supabase/client';
 
 interface DailyData {
@@ -53,6 +55,7 @@ export default function Campaigns() {
   const [selectedCampaignDetails, setSelectedCampaignDetails] = useState<any>(null);
   const [campaignsData, setCampaignsData] = useState<Record<string, any>>({});
   const [calendarView, setCalendarView] = useState<'dates' | 'week-numbers'>('dates');
+  const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
 
   useEffect(() => {
     loadFromDatabase();
@@ -243,29 +246,86 @@ export default function Campaigns() {
     }
   };
 
-  const getCampaignSummary = (campaignName: string) => {
-    // Use total_count from database instead of summing daily data
+  const getCampaignSummary = (campaignName: string, dateFilter?: DateRange) => {
     const campaignData = campaignMetrics.filter(m => m.campaignName === campaignName);
     
+    // Filter metrics by date range if provided
+    const filterMetricsByDate = (metric: any) => {
+      if (!dateFilter?.from || !metric.dailyData) return metric.totalCount || 0;
+      
+      let filteredTotal = 0;
+      Object.entries(metric.dailyData).forEach(([dateKey, value]) => {
+        try {
+          const metricDate = parseISO(dateKey);
+          const isInRange = dateFilter.to
+            ? isWithinInterval(metricDate, { start: dateFilter.from, end: dateFilter.to })
+            : metricDate >= dateFilter.from;
+          
+          if (isInRange) {
+            filteredTotal += Number(value);
+          }
+        } catch (e) {
+          // Skip invalid dates
+        }
+      });
+      
+      return filteredTotal;
+    };
+    
     const totals = {
-      invitations: campaignData.find(m => m.eventType === 'Connection Requests Sent')?.totalCount || 0,
-      connections: campaignData.find(m => m.eventType === 'Connections Made')?.totalCount || 0,
-      messages: campaignData.find(m => m.eventType === 'Messages Sent')?.totalCount || 0,
-      visits: campaignData.find(m => m.eventType === 'Profile Visits')?.totalCount || 0,
-      likes: campaignData.find(m => m.eventType === 'Post Likes')?.totalCount || 0,
-      comments: campaignData.find(m => m.eventType === 'Comments Done')?.totalCount || 0,
-      positiveResponses: campaignData.find(m => m.eventType === 'Positive Responses')?.totalCount || 0,
-      meetings: campaignData.find(m => m.eventType === 'Meetings')?.totalCount || 0,
-      proposals: campaignData.find(m => m.eventType === 'Proposals')?.totalCount || 0,
-      sales: campaignData.find(m => m.eventType === 'Sales')?.totalCount || 0
+      invitations: dateFilter 
+        ? filterMetricsByDate(campaignData.find(m => m.eventType === 'Connection Requests Sent'))
+        : campaignData.find(m => m.eventType === 'Connection Requests Sent')?.totalCount || 0,
+      connections: dateFilter
+        ? filterMetricsByDate(campaignData.find(m => m.eventType === 'Connections Made'))
+        : campaignData.find(m => m.eventType === 'Connections Made')?.totalCount || 0,
+      messages: dateFilter
+        ? filterMetricsByDate(campaignData.find(m => m.eventType === 'Messages Sent'))
+        : campaignData.find(m => m.eventType === 'Messages Sent')?.totalCount || 0,
+      visits: dateFilter
+        ? filterMetricsByDate(campaignData.find(m => m.eventType === 'Profile Visits'))
+        : campaignData.find(m => m.eventType === 'Profile Visits')?.totalCount || 0,
+      likes: dateFilter
+        ? filterMetricsByDate(campaignData.find(m => m.eventType === 'Post Likes'))
+        : campaignData.find(m => m.eventType === 'Post Likes')?.totalCount || 0,
+      comments: dateFilter
+        ? filterMetricsByDate(campaignData.find(m => m.eventType === 'Comments Done'))
+        : campaignData.find(m => m.eventType === 'Comments Done')?.totalCount || 0,
+      positiveResponses: dateFilter
+        ? filterMetricsByDate(campaignData.find(m => m.eventType === 'Positive Responses'))
+        : campaignData.find(m => m.eventType === 'Positive Responses')?.totalCount || 0,
+      meetings: dateFilter
+        ? filterMetricsByDate(campaignData.find(m => m.eventType === 'Meetings'))
+        : campaignData.find(m => m.eventType === 'Meetings')?.totalCount || 0,
+      proposals: dateFilter
+        ? filterMetricsByDate(campaignData.find(m => m.eventType === 'Proposals'))
+        : campaignData.find(m => m.eventType === 'Proposals')?.totalCount || 0,
+      sales: dateFilter
+        ? filterMetricsByDate(campaignData.find(m => m.eventType === 'Sales'))
+        : campaignData.find(m => m.eventType === 'Sales')?.totalCount || 0
     };
 
     const acceptanceRate = totals.invitations > 0 
       ? ((totals.connections / totals.invitations) * 100).toFixed(1)
       : '0.0';
 
-    // Calculate financial totals from leads
-    const campaignLeads = getAllLeads().filter(l => l.campaign === campaignName);
+    // Calculate financial totals from leads, filtered by date if provided
+    let campaignLeads = getAllLeads().filter(l => l.campaign === campaignName);
+    
+    if (dateFilter?.from) {
+      campaignLeads = campaignLeads.filter(lead => {
+        if (!lead.connectionDate) return false;
+        try {
+          const leadDate = new Date(lead.connectionDate);
+          return dateFilter.to
+            ? isWithinInterval(leadDate, { start: dateFilter.from, end: dateFilter.to })
+            : leadDate >= dateFilter.from;
+        } catch (e) {
+          return false;
+        }
+      });
+    }
+    
     const proposalValue = campaignLeads.reduce((sum, lead) => sum + (lead.proposalValue || 0), 0);
     const salesValue = campaignLeads.reduce((sum, lead) => sum + (lead.saleValue || 0), 0);
 
@@ -494,24 +554,41 @@ export default function Campaigns() {
           <CardTitle>Opções de Visualização</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div>
-            <Label className="mb-2 block">Granularidade de Dados</Label>
-            <Select value={granularity} onValueChange={(v) => setGranularity(v as 'daily' | 'weekly')}>
-              <SelectTrigger className="w-[200px]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="daily">Diário</SelectItem>
-                <SelectItem value="weekly">Semanal</SelectItem>
-              </SelectContent>
-            </Select>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <Label className="mb-2 block">Granularidade de Dados</Label>
+              <Select value={granularity} onValueChange={(v) => setGranularity(v as 'daily' | 'weekly')}>
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="daily">Diário</SelectItem>
+                  <SelectItem value="weekly">Semanal</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label className="mb-2 block">Filtro de Período</Label>
+              <DateRangePicker date={dateRange} onDateChange={setDateRange} />
+              {dateRange && (
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="mt-2 h-8 text-xs"
+                  onClick={() => setDateRange(undefined)}
+                >
+                  Limpar filtro
+                </Button>
+              )}
+            </div>
           </div>
           
           {selectedCampaigns.length > 1 && granularity === 'weekly' && (
             <div>
               <Label className="mb-2 block">Visualização de Calendário</Label>
               <Select value={calendarView} onValueChange={(v) => setCalendarView(v as 'dates' | 'week-numbers')}>
-                <SelectTrigger className="w-[250px]">
+                <SelectTrigger className="w-full md:w-[250px]">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -533,10 +610,18 @@ export default function Campaigns() {
         <>
           {/* Campaign Conversion Funnels */}
           <div>
-            <h2 className="text-2xl font-bold mb-4">Funil de Conversão</h2>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-2xl font-bold">Funil de Conversão</h2>
+              {dateRange?.from && (
+                <Badge variant="outline" className="text-sm">
+                  {format(dateRange.from, "dd/MM/yyyy", { locale: ptBR })}
+                  {dateRange.to && ` - ${format(dateRange.to, "dd/MM/yyyy", { locale: ptBR })}`}
+                </Badge>
+              )}
+            </div>
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
               {selectedCampaigns.map(campaign => {
-                const summary = getCampaignSummary(campaign);
+                const summary = getCampaignSummary(campaign, dateRange);
                 return (
                   <CampaignFunnelChart
                     key={campaign}
