@@ -664,6 +664,7 @@ export function parseExcelFile(file: File): Promise<ExcelSheetData> {
     const reader = new FileReader();
     
     reader.onload = (e) => {
+      console.log('=== INICIANDO PARSE DO EXCEL ===');
       try {
         const data = e.target?.result;
         const workbook = XLSX.read(data, { type: 'binary' });
@@ -677,58 +678,85 @@ export function parseExcelFile(file: File): Promise<ExcelSheetData> {
         
         const campaignNameConsolidation = new Set<string>();
         
+        console.log(`Total de abas no arquivo: ${workbook.SheetNames.length}`);
+        console.log('Abas encontradas:', workbook.SheetNames);
+        
         workbook.SheetNames.forEach((sheetName) => {
           const sheet = workbook.Sheets[sheetName];
           const sheetData = XLSX.utils.sheet_to_json(sheet);
           const normalizedName = sheetName.toLowerCase().trim();
           
+          console.log(`\n--- Processando aba: ${sheetName} (${sheetData.length} linhas) ---`);
+          
           // Processar Leads Positivos
           if (normalizedName.includes('leads positivos')) {
+            console.log('✓ Detectado: Leads Positivos');
             result.positiveLeads = parsePositiveLeads(sheetData);
+            console.log(`Leads positivos importados: ${result.positiveLeads.length}`);
             return;
           }
           
           // Processar Leads Negativos
           if (normalizedName.includes('leads negativos')) {
+            console.log('✓ Detectado: Leads Negativos');
             result.negativeLeads = parseNegativeLeads(sheetData);
+            console.log(`Leads negativos importados: ${result.negativeLeads.length}`);
             return;
           }
           
           // Processar aba Inputs (métricas diárias)
           if (normalizedName.includes('inputs')) {
+            console.log('✓ Detectado: Inputs (métricas diárias)');
             const inputsMetrics = parseInputsSheet(sheetData, campaignNameConsolidation);
+            console.log(`Métricas da aba Inputs: ${inputsMetrics.length}`);
             result.campaignMetrics.push(...inputsMetrics);
             return;
           }
           
           // Processar aba Compilado (dados consolidados)
           if (normalizedName.includes('compilado')) {
+            console.log('✓ Detectado: Compilado (dados consolidados)');
             const compiladoMetrics = parseCompiladoSheet(sheetData, campaignNameConsolidation);
+            console.log(`Métricas da aba Compilado: ${compiladoMetrics.length}`);
             result.campaignMetrics.push(...compiladoMetrics);
             return;
           }
           
           // Processar aba Dados Gerais (comparativo de campanhas)
           if (normalizedName.includes('dados gerais')) {
+            console.log('✓ Detectado: Dados Gerais (comparativo)');
             const dadosGeraisMetrics = parseDadosGeraisSheet(sheetData, campaignNameConsolidation);
+            console.log(`Métricas da aba Dados Gerais: ${dadosGeraisMetrics.length}`);
             result.campaignMetrics.push(...dadosGeraisMetrics);
             return;
           }
           
           // Outras abas fixas (ignorar)
-          if (isFixedSheet(sheetName)) return;
+          if (isFixedSheet(sheetName)) {
+            console.log(`⊘ Aba fixa ignorada: ${sheetName}`);
+            return;
+          }
           
           // Processar abas de campanha individual
+          console.log('→ Tentando processar como aba de campanha individual...');
           const campaignHeader = extractCampaignHeader(sheetData);
-          if (!campaignHeader || !campaignHeader.campaignName) return;
+          if (!campaignHeader || !campaignHeader.campaignName) {
+            console.log(`✗ Não foi possível extrair header de campanha`);
+            return;
+          }
           
+          console.log(`✓ Header de campanha extraído: ${campaignHeader.campaignName}`);
           result.allCampaignDetails?.push(campaignHeader);
           
           if (normalizedName.includes('diário') || normalizedName.includes('diario')) {
+            console.log('→ Processando como aba DIÁRIA');
             const dailyMetrics = parseDailyMetricsFromDiarioSheet(sheetData, campaignHeader, campaignNameConsolidation);
+            console.log(`Métricas diárias extraídas: ${dailyMetrics.length}`);
             result.campaignMetrics.push(...dailyMetrics);
           } else {
+            console.log('→ Processando como aba SEMANAL');
             const weeklyMetrics = parseWeeklyMetricsFromCampaignSheet(sheetData, campaignHeader, campaignNameConsolidation);
+            console.log(`Métricas semanais extraídas: ${weeklyMetrics.length}`);
             result.campaignMetrics.push(...weeklyMetrics);
           }
         });
@@ -761,6 +789,14 @@ export function parseExcelFile(file: File): Promise<ExcelSheetData> {
         });
         
         result.campaignMetrics = Object.values(consolidatedMetrics);
+        
+        console.log('\n=== RESUMO DO PARSE ===');
+        console.log(`Campanhas detectadas: ${result.campaignMetrics.length > 0 ? Array.from(new Set(result.campaignMetrics.map(m => m.campaignName))).join(', ') : 'Nenhuma'}`);
+        console.log(`Total de métricas: ${result.campaignMetrics.length}`);
+        console.log(`Leads positivos: ${result.positiveLeads.length}`);
+        console.log(`Leads negativos: ${result.negativeLeads.length}`);
+        console.log(`Detalhes de campanhas: ${result.allCampaignDetails?.length || 0}`);
+        console.log('========================\n');
         
         resolve(result);
       } catch (error) {
