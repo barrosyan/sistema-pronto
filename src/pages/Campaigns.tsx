@@ -234,26 +234,19 @@ export default function Campaigns() {
   };
 
   const getCampaignSummary = (campaignName: string) => {
-    const weeklyData = getWeeklyDataForCampaign(campaignName);
-    const totals = weeklyData.reduce((acc, week) => ({
-      invitations: acc.invitations + week.invitations,
-      connections: acc.connections + week.connections,
-      messages: acc.messages + week.messages,
-      visits: acc.visits + week.visits,
-      likes: acc.likes + week.likes,
-      comments: acc.comments + week.comments,
-      positiveResponses: acc.positiveResponses + week.positiveResponses,
-      meetings: acc.meetings + week.meetings
-    }), {
-      invitations: 0,
-      connections: 0,
-      messages: 0,
-      visits: 0,
-      likes: 0,
-      comments: 0,
-      positiveResponses: 0,
-      meetings: 0
-    });
+    // Use total_count from database instead of summing daily data
+    const campaignData = campaignMetrics.filter(m => m.campaignName === campaignName);
+    
+    const totals = {
+      invitations: campaignData.find(m => m.eventType === 'Connection Requests Sent')?.totalCount || 0,
+      connections: campaignData.find(m => m.eventType === 'Connections Made')?.totalCount || 0,
+      messages: campaignData.find(m => m.eventType === 'Messages Sent')?.totalCount || 0,
+      visits: campaignData.find(m => m.eventType === 'Profile Visits')?.totalCount || 0,
+      likes: campaignData.find(m => m.eventType === 'Post Likes')?.totalCount || 0,
+      comments: campaignData.find(m => m.eventType === 'Comments Done')?.totalCount || 0,
+      positiveResponses: campaignData.find(m => m.eventType === 'Positive Responses')?.totalCount || 0,
+      meetings: campaignData.find(m => m.eventType === 'Meetings')?.totalCount || 0
+    };
 
     const acceptanceRate = totals.invitations > 0 
       ? ((totals.connections / totals.invitations) * 100).toFixed(1)
