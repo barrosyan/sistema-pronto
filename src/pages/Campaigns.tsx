@@ -16,6 +16,7 @@ import { CampaignDialog } from '@/components/CampaignDialog';
 import { CampaignFunnelChart } from '@/components/CampaignFunnelChart';
 import { CampaignFunnelComparison } from '@/components/CampaignFunnelComparison';
 import { CampaignTrendChart } from '@/components/CampaignTrendChart';
+import { WeeklyPerformanceChart } from '@/components/WeeklyPerformanceChart';
 import { DateRangePicker } from '@/components/DateRangePicker';
 import { DateRange } from 'react-day-picker';
 import { supabase } from '@/integrations/supabase/client';
@@ -44,6 +45,8 @@ interface WeeklyData {
   comments: number;
   positiveResponses: number;
   meetings: number;
+  proposals: number;
+  sales: number;
   activeDays: number;
   totalDays: number;
 }
@@ -204,6 +207,8 @@ export default function Campaigns() {
           comments: 0,
           positiveResponses: 0,
           meetings: 0,
+          proposals: 0,
+          sales: 0,
           activeDays: 0,
           totalDays: 0
         });
@@ -229,12 +234,32 @@ export default function Campaigns() {
 
     const leads = getAllLeads().filter(l => l.campaign === campaignName);
     weeklyMap.forEach(weekData => {
-      const weekLeads = leads.filter(l => {
+      const weekStart = new Date(weekData.startDate);
+      const weekEnd = new Date(weekData.endDate);
+      
+      // Count meetings
+      const weekMeetings = leads.filter(l => {
         if (!l.meetingDate) return false;
         const meetingDate = new Date(l.meetingDate);
-        return meetingDate >= new Date(weekData.startDate) && meetingDate <= new Date(weekData.endDate);
+        return meetingDate >= weekStart && meetingDate <= weekEnd;
       });
-      weekData.meetings = weekLeads.length;
+      weekData.meetings = weekMeetings.length;
+      
+      // Count proposals
+      const weekProposals = leads.filter(l => {
+        if (!l.proposalDate) return false;
+        const proposalDate = new Date(l.proposalDate);
+        return proposalDate >= weekStart && proposalDate <= weekEnd;
+      });
+      weekData.proposals = weekProposals.length;
+      
+      // Count sales
+      const weekSales = leads.filter(l => {
+        if (!l.saleDate) return false;
+        const saleDate = new Date(l.saleDate);
+        return saleDate >= weekStart && saleDate <= weekEnd;
+      });
+      weekData.sales = weekSales.length;
     });
 
     return Array.from(weeklyMap.values()).sort((a, b) => a.startDate.localeCompare(b.startDate));
@@ -740,6 +765,10 @@ export default function Campaigns() {
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {selectedCampaigns.map(campaign => {
               const summary = getCampaignSummary(campaign);
+              const leads = getAllLeads().filter(l => l.campaign === campaign);
+              const proposalsCount = leads.filter(l => l.proposalDate).length;
+              const salesCount = leads.filter(l => l.saleDate).length;
+              
               return (
                 <Card key={campaign}>
                   <CardHeader>
@@ -771,11 +800,27 @@ export default function Campaigns() {
                       <span className="text-sm text-muted-foreground">Reuniões</span>
                       <span className="font-bold text-primary">{summary.meetings}</span>
                     </div>
+                    <div className="flex justify-between">
+                      <span className="text-sm text-muted-foreground">Propostas</span>
+                      <span className="font-bold text-orange-500">{proposalsCount}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-sm text-muted-foreground">Vendas</span>
+                      <span className="font-bold text-green-600">{salesCount}</span>
+                    </div>
                   </CardContent>
                 </Card>
               );
             })}
           </div>
+
+          {/* Weekly Performance Chart */}
+          {selectedCampaigns.length === 1 && (
+            <WeeklyPerformanceChart
+              campaignName={selectedCampaigns[0]}
+              data={getWeeklyDataForCampaign(selectedCampaigns[0])}
+            />
+          )}
 
           {/* Charts */}
           <Tabs defaultValue="invitations" className="w-full">
