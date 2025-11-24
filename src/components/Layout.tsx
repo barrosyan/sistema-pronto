@@ -1,7 +1,7 @@
 import { ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { NavLink } from './NavLink';
-import { Merge, Users, Sparkles, LogOut, User, Settings, Target } from 'lucide-react';
+import { Merge, Users, Sparkles, LogOut, User, Settings, Target, Calendar } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from './ui/button';
 import { toast } from 'sonner';
@@ -68,6 +68,9 @@ export const Layout = ({ children }: LayoutProps) => {
             </NavLink>
             <NavLink to="/campaigns" icon={<Target className="h-4 w-4" />} subtitle="Visão Geral">
               Campanhas
+            </NavLink>
+            <NavLink to="/events" icon={<Calendar className="h-4 w-4" />}>
+              Eventos
             </NavLink>
             <NavLink to="/" icon={<Users className="h-4 w-4" />}>
               Leads
