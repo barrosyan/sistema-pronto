@@ -10,6 +10,7 @@ import Merge from "./pages/Merge";
 import ContentGeneration from "./pages/ContentGeneration";
 import Profile from "./pages/Profile";
 import Campaigns from "./pages/Campaigns";
+import EventsManagement from "./pages/EventsManagement";
 import UserSettings from "./pages/UserSettings";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
@@ -27,6 +28,7 @@ function App() {
             <Route path="/auth" element={<Auth />} />
             <Route path="/" element={<ProtectedRoute><Layout><Leads /></Layout></ProtectedRoute>} />
             <Route path="/campaigns" element={<ProtectedRoute><Layout><Campaigns /></Layout></ProtectedRoute>} />
+            <Route path="/events" element={<ProtectedRoute><Layout><EventsManagement /></Layout></ProtectedRoute>} />
             <Route path="/merge" element={<ProtectedRoute><Layout><Merge /></Layout></ProtectedRoute>} />
             <Route path="/content-generation" element={<ProtectedRoute><Layout><ContentGeneration /></Layout></ProtectedRoute>} />
             <Route path="/profile" element={<ProtectedRoute><Layout><Profile /></Layout></ProtectedRoute>} />

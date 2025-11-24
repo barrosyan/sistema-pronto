@@ -55,6 +55,7 @@ export type Database = {
           cadence: string | null
           company: string | null
           created_at: string | null
+          event_id: string | null
           id: string
           job_titles: string | null
           name: string
@@ -67,6 +68,7 @@ export type Database = {
           cadence?: string | null
           company?: string | null
           created_at?: string | null
+          event_id?: string | null
           id?: string
           job_titles?: string | null
           name: string
@@ -79,12 +81,60 @@ export type Database = {
           cadence?: string | null
           company?: string | null
           created_at?: string | null
+          event_id?: string | null
           id?: string
           job_titles?: string | null
           name?: string
           objective?: string | null
           profile_name?: string | null
           updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaigns_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      events: {
+        Row: {
+          created_at: string
+          description: string | null
+          end_date: string | null
+          event_type: string | null
+          id: string
+          location: string | null
+          name: string
+          start_date: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          end_date?: string | null
+          event_type?: string | null
+          id?: string
+          location?: string | null
+          name: string
+          start_date?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          end_date?: string | null
+          event_type?: string | null
+          id?: string
+          location?: string | null
+          name?: string
+          start_date?: string | null
+          updated_at?: string
           user_id?: string
         }
         Relationships: []

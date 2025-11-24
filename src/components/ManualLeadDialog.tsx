@@ -34,18 +34,16 @@ export function ManualLeadDialog({
   onSave,
 }: ManualLeadDialogProps) {
   const [campaigns, setCampaigns] = useState<string[]>([]);
-  const [sourceType, setSourceType] = useState<'campaign' | 'custom'>('campaign');
   const [formData, setFormData] = useState<Partial<Lead>>({
     status: 'pending',
-    source: '',
+    source: 'Kontax',
   });
 
   useEffect(() => {
     if (open) {
       loadCampaigns();
       // Reset form
-      setFormData({ status: 'pending', source: '' });
-      setSourceType('campaign');
+      setFormData({ status: 'pending', source: 'Kontax' });
     }
   }, [open]);
 
@@ -161,35 +159,14 @@ export function ManualLeadDialog({
 
           {/* Source/Campanha */}
           <div className="space-y-4">
-            <h3 className="text-sm font-semibold">Source/Campanha *</h3>
+            <h3 className="text-sm font-semibold">Source e Campanha</h3>
             
-            <div className="space-y-4">
-              <div className="flex gap-4">
-                <Button
-                  type="button"
-                  variant={sourceType === 'campaign' ? 'default' : 'outline'}
-                  onClick={() => setSourceType('campaign')}
-                  className="flex-1"
-                >
-                  Selecionar Campanha
-                </Button>
-                <Button
-                  type="button"
-                  variant={sourceType === 'custom' ? 'default' : 'outline'}
-                  onClick={() => setSourceType('custom')}
-                  className="flex-1"
-                >
-                  Digitar Source
-                </Button>
-              </div>
-
-              {sourceType === 'campaign' ? (
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="campaign">Campanha *</Label>
                 <Select
                   value={formData.campaign || ''}
-                  onValueChange={(value) => {
-                    handleInputChange('campaign', value);
-                    handleInputChange('source', value);
-                  }}
+                  onValueChange={(value) => handleInputChange('campaign', value)}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Selecione uma campanha" />
@@ -202,18 +179,24 @@ export function ManualLeadDialog({
                     ))}
                   </SelectContent>
                 </Select>
-              ) : (
-                <div className="space-y-2">
-                  <Input
-                    value={formData.source || ''}
-                    onChange={(e) => {
-                      handleInputChange('source', e.target.value);
-                      handleInputChange('campaign', e.target.value);
-                    }}
-                    placeholder="Digite o source/origem do lead"
-                  />
-                </div>
-              )}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="source">Source *</Label>
+                <Select
+                  value={formData.source || 'Kontax'}
+                  onValueChange={(value) => handleInputChange('source', value)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione o source" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Kontax">Kontax</SelectItem>
+                    <SelectItem value="Evento Presencial">Evento Presencial</SelectItem>
+                    <SelectItem value="Outros">Outros</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           </div>
 
