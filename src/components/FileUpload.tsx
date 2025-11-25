@@ -1,10 +1,17 @@
 import { useCallback, useState } from 'react';
 import { Upload, FileSpreadsheet, X } from 'lucide-react';
-import Papa from 'papaparse';
 import * as XLSX from 'xlsx';
-import { ParsedFile } from '@/utils/dataProcessing';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+
+export interface ParsedFile {
+  name: string;
+  headers: string[];
+  data: any;
+  rowCount: number;
+  type: 'csv' | 'excel';
+  rawContent?: string; // For CSV files
+}
 
 interface FileUploadProps {
   onFilesProcessed: (files: ParsedFile[]) => void;
@@ -19,21 +26,19 @@ export function FileUpload({ onFilesProcessed }: FileUploadProps) {
     const fileExtension = file.name.split('.').pop()?.toLowerCase();
 
     if (fileExtension === 'csv') {
-      return new Promise((resolve, reject) => {
-        Papa.parse(file, {
-          header: true,
-          skipEmptyLines: true,
-          complete: (results) => {
-            resolve({
-              name: file.name,
-              headers: results.meta.fields || [],
-              data: results.data as Record<string, any>[],
-              rowCount: results.data.length,
-            });
-          },
-          error: reject,
-        });
-      });
+      // Read CSV as text for campaign CSV processing
+      const text = await file.text();
+      const lines = text.split('\n').filter(line => line.trim());
+      const headers = lines.length > 0 ? lines[0].split(',').map(h => h.trim()) : [];
+      
+      return {
+        name: file.name,
+        headers,
+        data: text,
+        rowCount: lines.length - 1, // Exclude header
+        type: 'csv',
+        rawContent: text,
+      };
     } else if (fileExtension === 'xlsx' || fileExtension === 'xls') {
       return new Promise((resolve, reject) => {
         const reader = new FileReader();
@@ -50,6 +55,7 @@ export function FileUpload({ onFilesProcessed }: FileUploadProps) {
               headers,
               data: jsonData as Record<string, any>[],
               rowCount: jsonData.length,
+              type: 'excel',
             });
           } catch (error) {
             reject(error);
