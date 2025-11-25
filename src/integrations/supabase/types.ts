@@ -60,6 +60,7 @@ export type Database = {
           job_titles: string | null
           name: string
           objective: string | null
+          profile_id: string | null
           profile_name: string | null
           updated_at: string | null
           user_id: string
@@ -73,6 +74,7 @@ export type Database = {
           job_titles?: string | null
           name: string
           objective?: string | null
+          profile_id?: string | null
           profile_name?: string | null
           updated_at?: string | null
           user_id: string
@@ -86,6 +88,7 @@ export type Database = {
           job_titles?: string | null
           name?: string
           objective?: string | null
+          profile_id?: string | null
           profile_name?: string | null
           updated_at?: string | null
           user_id?: string
@@ -96,6 +99,13 @@ export type Database = {
             columns: ["event_id"]
             isOneToOne: false
             referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaigns_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_data"
             referencedColumns: ["id"]
           },
         ]
@@ -339,6 +349,30 @@ export type Database = {
           full_name?: string | null
           id?: string
           updated_at?: string | null
+        }
+        Relationships: []
+      }
+      profiles_data: {
+        Row: {
+          created_at: string
+          id: string
+          profile_name: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          profile_name: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          profile_name?: string
+          updated_at?: string
+          user_id?: string
         }
         Relationships: []
       }

@@ -6,7 +6,7 @@ import { Upload, Trash2, Download, FileSpreadsheet, FileText, Play } from 'lucid
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { Input } from '@/components/ui/input';
-import { parseExcelSheets } from '@/utils/excelSheetParser';
+import { parseCampaignCsv } from '@/utils/campaignCsvParser';
 import DataImportPreview, { FilePreviewData } from '@/components/DataImportPreview';
 import { useCampaignData } from '@/hooks/useCampaignData';
 
@@ -207,35 +207,35 @@ export default function UserSettings() {
 
           if (downloadError) throw downloadError;
 
-          const file = new File([fileData], fileRecord.file_name, { type: fileRecord.file_type });
-          const parsedData = await parseExcelSheets(file);
+          const isCsv = fileRecord.file_name.toLowerCase().endsWith('.csv');
+          
+          if (isCsv) {
+            // Process campaign CSV
+            const text = await fileData.text();
+            const parsedData = parseCampaignCsv(text);
+            
+            const profileNames = Array.from(new Set(parsedData.map(d => d.profileName)));
+            const campaignNames = Array.from(new Set(parsedData.map(d => d.campaignName)));
+            
+            previews.push({
+              fileName: fileRecord.file_name,
+              campaignsCount: campaignNames.length,
+              metricsCount: parsedData.reduce((sum, d) => sum + d.metrics.length, 0),
+              positiveLeadsCount: 0,
+              negativeLeadsCount: 0,
+              campaignNames,
+            });
 
-          const campaignNames = Array.from(
-            new Set([
-              ...(parsedData.allCampaignDetails || []).map(d => d.campaignName).filter(Boolean),
-              ...parsedData.campaignMetrics.map(m => m.campaignName).filter(Boolean)
-            ])
-          ) as string[];
-
-          // Contar leads por status
-          const pendingLeads = parsedData.positiveLeads.filter((l: any) => l.status === 'pending').length;
-          const positiveLeads = parsedData.positiveLeads.filter((l: any) => l.status === 'positive').length;
-          const negativeLeads = parsedData.negativeLeads.filter((l: any) => l.status === 'negative').length;
-
-          previews.push({
-            fileName: fileRecord.file_name,
-            campaignsCount: parsedData.allCampaignDetails?.length || 0,
-            metricsCount: parsedData.campaignMetrics.length,
-            positiveLeadsCount: pendingLeads, // CSV leads são pendentes
-            negativeLeadsCount: negativeLeads,
-            campaignNames,
-          });
-
-          parsedDataArray.push({
-            fileRecord,
-            parsedData,
-            user,
-          });
+            parsedDataArray.push({
+              fileRecord,
+              parsedData,
+              user,
+              type: 'csv',
+            });
+          } else {
+            // Skip Excel for now - only CSV supported
+            throw new Error('Apenas arquivos CSV são suportados para dados de campanhas');
+          }
 
         } catch (error) {
           console.error(`Error parsing file ${fileRecord.file_name}:`, error);
@@ -289,10 +289,10 @@ export default function UserSettings() {
     
     setProcessing(true);
     let totalMetrics = 0;
-    let totalLeads = 0;
+    let totalProfiles = 0;
+    let totalCampaigns = 0;
 
     try {
-      // CRITICAL: Clear all existing data before import
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
         toast.error('Usuário não autenticado');
@@ -301,278 +301,100 @@ export default function UserSettings() {
 
       console.log('🗑️ Limpando dados existentes do usuário:', user.id);
       
-      // Delete in correct order to respect foreign keys: metrics and leads first, then campaigns
-      const { data: metricsData, error: metricsDeleteError } = await supabase
-        .from('campaign_metrics')
-        .delete()
-        .eq('user_id', user.id)
-        .select('id');
+      // Delete in correct order
+      await supabase.from('campaign_metrics').delete().eq('user_id', user.id);
+      await supabase.from('leads').delete().eq('user_id', user.id);
+      await supabase.from('campaigns').delete().eq('user_id', user.id);
+      await supabase.from('profiles_data').delete().eq('user_id', user.id);
       
-      if (metricsDeleteError) {
-        console.error('❌ Erro ao deletar métricas:', metricsDeleteError);
-        throw new Error('Falha ao limpar métricas: ' + metricsDeleteError.message);
-      }
-      console.log(`✅ ${metricsData?.length || 0} métricas deletadas`);
-
-      const { data: leadsData, error: leadsDeleteError } = await supabase
-        .from('leads')
-        .delete()
-        .eq('user_id', user.id)
-        .select('id');
-      
-      if (leadsDeleteError) {
-        console.error('❌ Erro ao deletar leads:', leadsDeleteError);
-        throw new Error('Falha ao limpar leads: ' + leadsDeleteError.message);
-      }
-      console.log(`✅ ${leadsData?.length || 0} leads deletados`);
-
-      const { data: campaignsData, error: campaignsDeleteError } = await supabase
-        .from('campaigns')
-        .delete()
-        .eq('user_id', user.id)
-        .select('id');
-      
-      if (campaignsDeleteError) {
-        console.error('❌ Erro ao deletar campanhas:', campaignsDeleteError);
-        throw new Error('Falha ao limpar campanhas: ' + campaignsDeleteError.message);
-      }
-      console.log(`✅ ${campaignsData?.length || 0} campanhas deletadas`);
-      
-      console.log('✅ Todos os dados foram limpos com sucesso');
-      
-      // Aguardar um pouco para garantir que o banco processou as deleções
+      console.log('✅ Todos os dados foram limpos');
       await new Promise(resolve => setTimeout(resolve, 500));
 
-      // STEP 1: Consolidate ALL data from ALL files BEFORE inserting
-      console.log('=== CONSOLIDANDO DADOS DE TODOS OS ARQUIVOS ===');
-      
-      const allCampaignDetailsMap = new Map<string, any>();
-      const allMetricsMap = new Map<string, any>();
-      const allLeadsMap = new Map<string, any>();
-      
-      // Consolidate data from all files
-      for (const { parsedData } of parsedFilesData) {
-        console.log('Consolidando arquivo com:', {
-          campanhas: parsedData.allCampaignDetails?.length,
-          metricas: parsedData.campaignMetrics.length,
-          leadsPositivos: parsedData.positiveLeads.length,
-          leadsNegativos: parsedData.negativeLeads.length
-        });
+      // Process CSV campaign data
+      for (const { parsedData, type } of parsedFilesData) {
+        if (type !== 'csv') continue;
         
-        // Consolidate campaign details
-        const campaignDetailsArray = parsedData.allCampaignDetails || 
-          (parsedData.campaignDetails ? [parsedData.campaignDetails] : []);
-        
-        campaignDetailsArray.forEach(detail => {
-          if (detail.campaignName) {
-            allCampaignDetailsMap.set(detail.campaignName, detail);
-          }
-        });
-        
-        // Consolidate campaign names from metrics
-        parsedData.campaignMetrics.forEach(metric => {
-          if (metric.campaignName && !allCampaignDetailsMap.has(metric.campaignName)) {
-            allCampaignDetailsMap.set(metric.campaignName, { campaignName: metric.campaignName });
-          }
-        });
-        
-        // Consolidate metrics
-        parsedData.campaignMetrics.forEach(metric => {
-          const key = `${metric.campaignName}|${metric.eventType}|${metric.profileName}`;
-          
-          if (allMetricsMap.has(key)) {
-            const existing = allMetricsMap.get(key)!;
-            const mergedDailyData = { ...existing.dailyData };
-            
-            Object.entries(metric.dailyData).forEach(([date, value]) => {
-              mergedDailyData[date] = (mergedDailyData[date] || 0) + (typeof value === 'number' ? value : 0);
-            });
-            
-            const mergedTotalCount = Object.values(mergedDailyData).reduce((sum: number, val) => {
-              const numVal = typeof val === 'number' ? val : 0;
-              return sum + numVal;
-            }, 0);
-            
-            allMetricsMap.set(key, {
-              ...existing,
-              dailyData: mergedDailyData,
-              totalCount: mergedTotalCount
-            });
-          } else {
-            allMetricsMap.set(key, metric);
-          }
-        });
-        
-        // Consolidate positive leads
-        parsedData.positiveLeads.forEach(lead => {
-          const key = `${lead.campaign}|${lead.name}`;
-          if (!allLeadsMap.has(key)) {
-            allLeadsMap.set(key, lead);
-          }
-        });
-        
-        // Consolidate negative leads
-        parsedData.negativeLeads.forEach(lead => {
-          const key = `${lead.campaign}|${lead.name}`;
-          if (!allLeadsMap.has(key)) {
-            allLeadsMap.set(key, lead);
-          }
-        });
-      }
-      
-      console.log('✅ Consolidação completa:', {
-        campanhas: allCampaignDetailsMap.size,
-        metricas: allMetricsMap.size,
-        leads: allLeadsMap.size
-      });
+        console.log(`📊 Processando ${parsedData.length} campaign-profile combinations`);
 
-      // STEP 2: Insert campaigns
-      console.log('=== INSERINDO CAMPANHAS ===');
-      const campaignsToInsert = Array.from(allCampaignDetailsMap.values()).map(detail => ({
-        user_id: user.id,
-        name: detail.campaignName,
-        company: detail.company || null,
-        profile_name: detail.profile || null,
-        objective: detail.objective || null,
-        cadence: detail.cadence || null,
-        job_titles: detail.jobTitles || null,
-      }));
-      
-      const { error: campaignsError } = await supabase
-        .from('campaigns')
-        .upsert(campaignsToInsert, {
-          onConflict: 'user_id,name',
-          ignoreDuplicates: false
-        });
-      
-      if (campaignsError) {
-        console.error('Erro ao inserir campanhas:', campaignsError);
-        throw campaignsError;
-      }
-      console.log(`✅ ${campaignsToInsert.length} campanhas inseridas`);
+        for (const data of parsedData) {
+          // Create profile
+          const { data: profile, error: profileError } = await supabase
+            .from('profiles_data')
+            .upsert({
+              user_id: user.id,
+              profile_name: data.profileName,
+            }, {
+              onConflict: 'user_id,profile_name',
+              ignoreDuplicates: false,
+            })
+            .select()
+            .single();
 
-      // STEP 3: Insert metrics
-      if (allMetricsMap.size > 0) {
-        console.log('=== INSERINDO MÉTRICAS ===');
-        const metricsToInsert = Array.from(allMetricsMap.values()).map(metric => ({
-          user_id: user.id,
-          campaign_name: metric.campaignName,
-          event_type: metric.eventType,
-          profile_name: metric.profileName,
-          total_count: metric.totalCount,
-          daily_data: metric.dailyData,
-        }));
+          if (profileError) {
+            console.error('❌ Error creating profile:', profileError);
+            continue;
+          }
 
-        console.log('📊 Primeiras 3 métricas a inserir:', metricsToInsert.slice(0, 3));
+          totalProfiles++;
+          console.log(`✅ Profile: ${data.profileName}`);
 
-        const { error: metricsError, data: metricsInserted } = await supabase
-          .from('campaign_metrics')
-          .upsert(metricsToInsert, {
-            onConflict: 'user_id,campaign_name,event_type,profile_name',
-            ignoreDuplicates: false
-          })
-          .select('id');
+          // Create campaign
+          const { data: campaign, error: campaignError } = await supabase
+            .from('campaigns')
+            .insert({
+              user_id: user.id,
+              profile_id: profile.id,
+              name: data.campaignName,
+              profile_name: data.profileName,
+            })
+            .select()
+            .single();
 
-        if (metricsError) {
-          console.error('❌ Erro ao inserir métricas:', {
-            message: metricsError.message,
-            details: metricsError.details,
-            hint: metricsError.hint,
-            code: metricsError.code
-          });
-          throw metricsError;
+          if (campaignError) {
+            console.error('❌ Error creating campaign:', campaignError);
+            continue;
+          }
+
+          totalCampaigns++;
+          console.log(`✅ Campaign: ${data.campaignName}`);
+
+          // Insert metrics
+          for (const metric of data.metrics) {
+            const { error: metricError } = await supabase
+              .from('campaign_metrics')
+              .insert({
+                user_id: user.id,
+                campaign_name: data.campaignName,
+                profile_name: data.profileName,
+                event_type: metric.eventType,
+                total_count: metric.totalCount,
+                daily_data: metric.dailyData,
+              });
+
+            if (metricError) {
+              console.error(`❌ Error inserting metric ${metric.eventType}:`, metricError);
+            } else {
+              totalMetrics++;
+              console.log(`✅ Metric: ${metric.eventType}`);
+            }
+          }
         }
-        console.log(`✅ ${metricsInserted?.length || metricsToInsert.length} métricas inseridas`);
-        totalMetrics = metricsToInsert.length;
-      }
-
-      // STEP 4: Insert leads
-      if (allLeadsMap.size > 0) {
-        console.log('=== INSERINDO LEADS ===');
-        const leadsToInsert = Array.from(allLeadsMap.values()).map(lead => ({
-          user_id: user.id,
-          campaign: lead.campaign,
-          linkedin: lead.linkedin,
-          name: lead.name,
-          position: lead.position,
-          company: lead.company,
-          status: lead.status,
-          positive_response_date: lead.positiveResponseDate,
-          transfer_date: lead.transferDate,
-          status_details: lead.statusDetails,
-          comments: lead.comments,
-          follow_up_1_date: lead.followUp1Date,
-          follow_up_1_comments: lead.followUp1Comments,
-          follow_up_2_date: lead.followUp2Date,
-          follow_up_2_comments: lead.followUp2Comments,
-          follow_up_3_date: lead.followUp3Date,
-          follow_up_3_comments: lead.followUp3Comments,
-          follow_up_4_date: lead.followUp4Date,
-          follow_up_4_comments: lead.followUp4Comments,
-          observations: lead.observations,
-          meeting_schedule_date: lead.meetingScheduleDate,
-          meeting_date: lead.meetingDate,
-          proposal_date: lead.proposalDate,
-          proposal_value: lead.proposalValue != null ? Number(lead.proposalValue) : null,
-          sale_date: lead.saleDate,
-          sale_value: lead.saleValue != null ? Number(lead.saleValue) : null,
-          profile: lead.profile,
-          classification: lead.classification,
-          attended_webinar: lead.attendedWebinar,
-          whatsapp: lead.whatsapp,
-          stand_day: lead.standDay,
-          pavilion: lead.pavilion,
-          stand: lead.stand,
-          source: lead.source,
-          connection_date: lead.connectionDate,
-        }));
-
-        const { error: leadsError } = await supabase
-          .from('leads')
-          .upsert(leadsToInsert, {
-            onConflict: 'user_id,campaign,name',
-            ignoreDuplicates: false
-          });
-
-        if (leadsError) {
-          console.error('Erro ao inserir leads:', leadsError);
-          throw leadsError;
-        }
-        console.log(`✅ ${leadsToInsert.length} leads inseridos`);
-        totalLeads = leadsToInsert.length;
       }
 
       console.log('=== Importação concluída ===');
+      console.log('Total perfis:', totalProfiles);
+      console.log('Total campanhas:', totalCampaigns);
       console.log('Total métricas:', totalMetrics);
-      console.log('Total leads:', totalLeads);
       
-      // Reload data in the frontend
       await loadFromDatabase();
-      console.log('Dados recarregados no frontend');
-      
       setShowPreview(false);
       setParsedFilesData([]);
       setPreviewData([]);
-      toast.success(`Importação concluída! ${totalMetrics} métricas e ${totalLeads} leads adicionados.`);
+      
+      toast.success(`Importação concluída! ${totalCampaigns} campanhas, ${totalMetrics} métricas`);
     } catch (error: any) {
-      console.error('=== Erro na importação ===');
-      console.error('Detalhes do erro:', error);
-      
-      // Mostrar mensagem de erro detalhada na tela
-      const errorMessage = error?.message || 'Erro desconhecido';
-      const errorCode = error?.code || '';
-      const errorDetails = error?.details || '';
-      
-      let userMessage = 'Erro ao importar dados';
-      if (errorMessage.includes('duplicate key')) {
-        userMessage = 'Alguns dados já existem no banco. Tente limpar os dados antes de importar.';
-      } else if (errorMessage.includes('violates')) {
-        userMessage = `Erro de validação: ${errorMessage}`;
-      } else {
-        userMessage = `${errorMessage}${errorCode ? ` (Código: ${errorCode})` : ''}${errorDetails ? ` - ${errorDetails}` : ''}`;
-      }
-      
-      toast.error(userMessage, { duration: 10000 });
+      console.error('Erro na importação:', error);
+      toast.error(error.message || 'Erro ao importar dados');
     } finally {
       setProcessing(false);
     }
