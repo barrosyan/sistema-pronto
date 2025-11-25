@@ -26,7 +26,6 @@ import { useCampaignData } from '@/hooks/useCampaignData';
 import { parseExcelSheets } from '@/utils/excelSheetParser';
 import { LeadEditDialog } from '@/components/LeadEditDialog';
 import { ManualLeadDialog } from '@/components/ManualLeadDialog';
-import { UploadManager } from '@/components/UploadManager';
 
 const ITEMS_PER_PAGE = 20;
 
@@ -166,8 +165,6 @@ const Leads = () => {
 
   return (
     <div className="space-y-6">
-      <UploadManager />
-      
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold text-foreground">Gestão de Leads</h1>
