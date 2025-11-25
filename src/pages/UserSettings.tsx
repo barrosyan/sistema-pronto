@@ -463,18 +463,26 @@ export default function UserSettings() {
           daily_data: metric.dailyData,
         }));
 
-        const { error: metricsError } = await supabase
+        console.log('📊 Primeiras 3 métricas a inserir:', metricsToInsert.slice(0, 3));
+
+        const { error: metricsError, data: metricsInserted } = await supabase
           .from('campaign_metrics')
           .upsert(metricsToInsert, {
             onConflict: 'user_id,campaign_name,event_type,profile_name',
             ignoreDuplicates: false
-          });
+          })
+          .select('id');
 
         if (metricsError) {
-          console.error('Erro ao inserir métricas:', metricsError);
+          console.error('❌ Erro ao inserir métricas:', {
+            message: metricsError.message,
+            details: metricsError.details,
+            hint: metricsError.hint,
+            code: metricsError.code
+          });
           throw metricsError;
         }
-        console.log(`✅ ${metricsToInsert.length} métricas inseridas`);
+        console.log(`✅ ${metricsInserted?.length || metricsToInsert.length} métricas inseridas`);
         totalMetrics = metricsToInsert.length;
       }
 
