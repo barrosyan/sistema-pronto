@@ -56,6 +56,11 @@ export function parseLeadsCsv(csvContent: string, fileName?: string): ParsedLead
     // Extract connection date from "Connected At" field or Messages field
     let connectionDate = row['Connected At'] || row['connected_at'] || null;
     
+    // Filter out invalid date values
+    if (connectionDate && (connectionDate === 'Never' || connectionDate === 'never' || connectionDate.trim() === '')) {
+      connectionDate = null;
+    }
+    
     // Fallback: try to extract from Messages field if present
     if (!connectionDate) {
       const messagesField = row['Messages Sent: 1, Received: 4, Connected: Thu Apr 17 2025'] || 
@@ -65,6 +70,10 @@ export function parseLeadsCsv(csvContent: string, fileName?: string): ParsedLead
         const connectedMatch = messagesField.match(/Connected:\s*(.+?)(?:\s|$)/i);
         if (connectedMatch) {
           connectionDate = connectedMatch[1].trim();
+          // Validate extracted date
+          if (connectionDate === 'Never' || connectionDate === 'never' || connectionDate.trim() === '') {
+            connectionDate = null;
+          }
         }
       }
     }
