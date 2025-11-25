@@ -12,6 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ChevronLeft, ChevronRight, Info, Plus } from 'lucide-react';
 import { CampaignDetailsDialog } from '@/components/CampaignDetailsDialog';
+import { CampaignDetailsCard } from '@/components/CampaignDetailsCard';
 import { CampaignDialog } from '@/components/CampaignDialog';
 import { CampaignFunnelChart } from '@/components/CampaignFunnelChart';
 import { CampaignFunnelComparison } from '@/components/CampaignFunnelComparison';
@@ -594,34 +595,12 @@ export default function Campaigns() {
           {selectedCampaigns.map(campaign => {
             const details = campaignsData[campaign];
             return (
-              <Card key={campaign}>
-                <CardHeader>
-                  <CardTitle className="text-base">{campaign}</CardTitle>
-                  <CardDescription>Detalhes da Campanha</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <div className="space-y-1">
-                    <p className="text-xs text-muted-foreground">Empresa</p>
-                    <p className="text-sm font-medium">{details?.company || 'Não informado'}</p>
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-xs text-muted-foreground">Perfil</p>
-                    <p className="text-sm font-medium">{details?.profile || 'Não informado'}</p>
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-xs text-muted-foreground">Objetivo da Campanha</p>
-                    <p className="text-sm font-medium">{details?.objective || 'Não informado'}</p>
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-xs text-muted-foreground">Cadência</p>
-                    <p className="text-sm font-medium">{details?.cadence || 'Não informado'}</p>
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-xs text-muted-foreground">Cargos na Pesquisa</p>
-                    <p className="text-sm font-medium">{details?.jobTitles || 'Não informado'}</p>
-                  </div>
-                </CardContent>
-              </Card>
+              <CampaignDetailsCard 
+                key={campaign} 
+                campaign={campaign} 
+                details={details}
+                onUpdate={() => loadCampaignDetails()}
+              />
             );
           })}
         </div>
