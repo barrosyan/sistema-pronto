@@ -147,8 +147,7 @@ export default function Campaigns() {
     
     campaignData.forEach(metric => {
       Object.keys(metric.dailyData || {}).forEach(date => {
-        // Only add valid dates in YYYY-MM-DD format
-        if (date && /^\d{4}-\d{2}-\d{2}$/.test(date)) {
+        if (date && date.trim() !== '') {
           allDates.add(date);
         }
       });
@@ -176,6 +175,7 @@ export default function Campaigns() {
         likes,
         comments,
         positiveResponses,
+        meetings,
         isActive
       };
     });
@@ -458,9 +458,24 @@ export default function Campaigns() {
       });
       
       return Array.from(allDatesSet).sort().map(date => {
-        const row: any = { date: format(parseISO(date), 'dd/MM/yyyy', { locale: ptBR }) };
+        // Formatar data apenas se estiver em formato YYYY-MM-DD válido
+        let displayDate = date;
+        if (/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+          try {
+            displayDate = format(parseISO(date), 'dd/MM/yyyy', { locale: ptBR });
+          } catch (error) {
+            // Se falhar ao parsear, usar a data original
+            displayDate = date;
+          }
+        }
+        
+        const row: any = { 
+          date: displayDate,
+          originalDate: date // Keep original for sorting/filtering
+        };
         selectedCampaigns.forEach(campaign => {
-          const campaignData = getDailyDataForCampaign(campaign).find(d => d.date === date);
+          const dailyData = getDailyDataForCampaign(campaign);
+          const campaignData = dailyData.find(d => d.date === date);
           row[`${campaign}_status`] = campaignData?.isActive ? 'Ativo' : 'Inativo';
           row[`${campaign}_invitations`] = campaignData?.invitations || 0;
           row[`${campaign}_connections`] = campaignData?.connections || 0;

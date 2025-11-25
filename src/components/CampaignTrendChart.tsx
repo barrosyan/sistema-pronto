@@ -38,18 +38,23 @@ export function CampaignTrendChart({ data, campaignName }: CampaignTrendChartPro
 
   const chartData = useMemo(() => {
     return data
-      .filter(item => item.date && item.date.trim() !== '' && /^\d{4}-\d{2}-\d{2}$/.test(item.date))
+      .filter(item => item.date && item.date.trim() !== '')
       .map(item => {
-        try {
-          return {
-            date: item.date,
-            formattedDate: format(parseISO(item.date), 'dd/MM/yyyy', { locale: ptBR }),
-            value: item[selectedMetric] || 0,
-          };
-        } catch (error) {
-          console.warn('Invalid date format:', item.date);
-          return null;
+        // Tentar parsear datas no formato YYYY-MM-DD
+        if (/^\d{4}-\d{2}-\d{2}$/.test(item.date)) {
+          try {
+            return {
+              date: item.date,
+              formattedDate: format(parseISO(item.date), 'dd/MM/yyyy', { locale: ptBR }),
+              value: item[selectedMetric] || 0,
+            };
+          } catch (error) {
+            console.warn('Invalid date format:', item.date);
+            return null;
+          }
         }
+        // Para outros formatos, usar como está (fallback)
+        return null;
       })
       .filter((item): item is NonNullable<typeof item> => item !== null)
       .sort((a, b) => a.date.localeCompare(b.date));
