@@ -23,31 +23,16 @@ export interface ParsedCampaignData {
   };
 }
 
-// Mapeamento de Event Types do CSV (inglês) para o sistema (português)
-const EVENT_TYPE_MAP: Record<string, string> = {
-  'Connection Requests Sent': 'Convites Enviados',
-  'Connection Requests Accepted': 'Conexões Realizadas',
-  'Messages Sent': 'Mensagens Enviadas',
-  'Messages Replied': 'Respostas Positivas',
-  'Follow-Ups 1': 'Reuniões Marcadas',
-  'Follow-Ups 2': 'Propostas',
-  'Follow-Ups 3': 'Vendas',
-  'Profile Visits': 'Visitas a Perfil',
-  'Post Likes': 'Curtidas',
-  'Comments Done': 'Comentários',
-};
-
 const EVENT_TYPES = [
-  'Convites Enviados',
-  'Conexões Realizadas',
-  'Mensagens Enviadas',
-  'Respostas Positivas',
-  'Reuniões Marcadas',
-  'Propostas',
-  'Vendas',
-  'Visitas a Perfil',
-  'Curtidas',
-  'Comentários',
+  'Profile Visits',
+  'Connection Requests Sent',
+  'Messages Sent',
+  'Connection Requests Accepted',
+  'Post Likes',
+  'Comments Done',
+  'Follow-Ups 1',
+  'Follow-Ups 2',
+  'Follow-Ups 3',
 ];
 
 export function parseCampaignCsv(csvContent: string): ParsedCampaignData[] {
@@ -73,8 +58,7 @@ export function parseCampaignCsv(csvContent: string): ParsedCampaignData[] {
   rows.forEach((row, index) => {
     const profileName = row['Profile Name']?.trim();
     const campaignName = row['Campaign Name']?.trim();
-    const rawEventType = row['Event Type']?.trim();
-    const eventType = EVENT_TYPE_MAP[rawEventType] || rawEventType; // Traduz para português
+    const eventType = row['Event Type']?.trim();
     const totalCount = parseFloat(row['Total Count'] || '0');
 
     if (!profileName || !campaignName || !eventType) {
@@ -161,20 +145,20 @@ export function calculateCampaignMetrics(data: ParsedCampaignData) {
     return metric?.totalCount || 0;
   };
 
-  // Métricas usando nomes em português
-  const invitationsSent = getMetricTotal('Convites Enviados');
-  const connectionsAccepted = getMetricTotal('Conexões Realizadas');
-  const messagesSent = getMetricTotal('Mensagens Enviadas');
-  const positiveResponses = getMetricTotal('Respostas Positivas');
-  const meetingsScheduled = getMetricTotal('Reuniões Marcadas');
-  const proposals = getMetricTotal('Propostas');
-  const sales = getMetricTotal('Vendas');
-  const profileVisits = getMetricTotal('Visitas a Perfil');
-  const likes = getMetricTotal('Curtidas');
-  const comments = getMetricTotal('Comentários');
+  const invitationsSent = getMetricTotal('Connection Requests Sent');
+  const connectionsAccepted = getMetricTotal('Connection Requests Accepted');
+  const profileVisits = getMetricTotal('Profile Visits');
+  const likes = getMetricTotal('Post Likes');
+  const comments = getMetricTotal('Comments Done');
+  const followUps1 = getMetricTotal('Follow-Ups 1');
+  const followUps2 = getMetricTotal('Follow-Ups 2');
+  const followUps3 = getMetricTotal('Follow-Ups 3');
+  
+  // Messages sent should count only follow-ups
+  const messagesSent = followUps1 + followUps2 + followUps3;
 
   const totalActivities = profileVisits + invitationsSent + messagesSent + 
-                         connectionsAccepted + likes + comments;
+                         likes + comments;
 
   const acceptanceRate = invitationsSent > 0 
     ? (connectionsAccepted / invitationsSent) * 100 
@@ -188,13 +172,12 @@ export function calculateCampaignMetrics(data: ParsedCampaignData) {
     connectionsAccepted,
     acceptanceRate,
     messagesSent,
-    positiveResponses,
-    meetingsScheduled,
-    proposals,
-    sales,
     profileVisits,
     likes,
     comments,
     totalActivities,
+    followUps1,
+    followUps2,
+    followUps3,
   };
 }
