@@ -14,6 +14,7 @@ import DataImportPreview, { FilePreviewData } from '@/components/DataImportPrevi
 import { useCampaignData } from '@/hooks/useCampaignData';
 import { DeleteDataSection } from '@/components/DeleteDataSection';
 import { ProfileCrud } from '@/components/ProfileCrud';
+import { PMConfiguration } from '@/components/PMConfiguration';
 
 type FileUpload = {
   id: string;
@@ -759,6 +760,9 @@ export default function UserSettings() {
           </div>
         </CardContent>
       </Card>
+
+      {/* PM Configuration */}
+      <PMConfiguration />
 
       {/* Profile Management */}
       <ProfileCrud onProfilesChange={loadProfiles} />
