@@ -1099,7 +1099,7 @@ export default function Campaigns() {
             </CardHeader>
             <CardContent>
               {/* Legend */}
-              <div className="flex items-center gap-4 mb-4 text-sm">
+              <div className="flex flex-wrap items-center gap-4 mb-4 text-sm">
                 <div className="flex items-center gap-1.5">
                   <span className="inline-block w-2 h-2 rounded-full bg-success" />
                   <span className="text-muted-foreground">Ativo (alguma métrica {'>'} 0)</span>
@@ -1107,6 +1107,10 @@ export default function Campaigns() {
                 <div className="flex items-center gap-1.5">
                   <span className="inline-block w-2 h-2 rounded-full bg-muted-foreground/30" />
                   <span className="text-muted-foreground">Inativo (todas métricas = 0)</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="inline-block px-1.5 py-0.5 rounded bg-primary/15 text-primary font-bold text-xs">42 ★</span>
+                  <span className="text-muted-foreground">Melhor performance (maior valor)</span>
                 </div>
               </div>
               <div className="overflow-x-auto">
@@ -1141,64 +1145,95 @@ export default function Campaigns() {
                     </tr>
                   </thead>
                   <tbody>
-                    {paginatedData.map((row, idx) => (
-                      <tr key={idx} className="border-b border-border/50 hover:bg-muted/30">
-                        <td className="p-2 text-sm font-medium sticky left-0 bg-card z-10">
-                          {calendarView === 'week-numbers' && selectedCampaigns.length > 1 && granularity === 'weekly'
-                            ? row.weekLabel
-                            : granularity === 'daily' ? row.date : row.week}
-                        </td>
-                        {selectedCampaigns.map(campaign => {
-                          const status = row[`${campaign}_status`];
+                    {(() => {
+                      // Calculate max values for each metric across all rows and campaigns
+                      const maxValues: Record<string, number> = {};
+                      paginatedData.forEach(row => {
+                        selectedCampaigns.forEach(campaign => {
                           const invitations = row[`${campaign}_invitations`] || 0;
                           const connections = row[`${campaign}_connections`] || 0;
                           const messages = row[`${campaign}_messages`] || 0;
+                          const positiveResponses = row[`${campaign}_positiveResponses`] || 0;
+                          const meetings = row[`${campaign}_meetings`] || 0;
                           
-                          // For daily: check if any metric > 0
-                          // For weekly: check active days count
-                          const isActive = granularity === 'daily' 
-                            ? (invitations > 0 || connections > 0 || messages > 0)
-                            : typeof status === 'number' && status > 0;
-                          
-                          return (
-                            <React.Fragment key={campaign}>
-                              <td className="p-2 text-center border-l border-border">
-                                {granularity === 'daily' ? (
-                                  <Badge 
-                                    variant={isActive ? "default" : "secondary"} 
-                                    className={`text-xs ${isActive ? 'bg-success text-success-foreground' : 'bg-muted text-muted-foreground'}`}
-                                  >
-                                    {isActive ? '● Ativo' : '○ Inativo'}
-                                  </Badge>
-                                ) : (
-                                  <div className="flex items-center justify-center gap-1">
-                                    <span className={`inline-block w-2 h-2 rounded-full ${status > 0 ? 'bg-success' : 'bg-muted-foreground/30'}`} />
-                                    <span className="text-sm font-medium">{status}/7</span>
-                                  </div>
-                                )}
-                              </td>
-                              <td className={`p-2 text-center text-sm ${invitations > 0 ? '' : 'text-muted-foreground'}`}>
-                                {invitations}
-                              </td>
-                              <td className={`p-2 text-center text-sm ${connections > 0 ? '' : 'text-muted-foreground'}`}>
-                                {connections}
-                              </td>
-                              <td className={`p-2 text-center text-sm ${messages > 0 ? '' : 'text-muted-foreground'}`}>
-                                {messages}
-                              </td>
-                              <td className={`p-2 text-center text-sm ${row[`${campaign}_positiveResponses`] > 0 ? 'text-success font-medium' : 'text-muted-foreground'}`}>
-                                {row[`${campaign}_positiveResponses`]}
-                              </td>
-                              {granularity === 'weekly' && (
-                                <td className={`p-2 text-center text-sm ${row[`${campaign}_meetings`] > 0 ? 'text-primary font-medium' : 'text-muted-foreground'}`}>
-                                  {row[`${campaign}_meetings`]}
+                          maxValues[`${campaign}_invitations`] = Math.max(maxValues[`${campaign}_invitations`] || 0, invitations);
+                          maxValues[`${campaign}_connections`] = Math.max(maxValues[`${campaign}_connections`] || 0, connections);
+                          maxValues[`${campaign}_messages`] = Math.max(maxValues[`${campaign}_messages`] || 0, messages);
+                          maxValues[`${campaign}_positiveResponses`] = Math.max(maxValues[`${campaign}_positiveResponses`] || 0, positiveResponses);
+                          maxValues[`${campaign}_meetings`] = Math.max(maxValues[`${campaign}_meetings`] || 0, meetings);
+                        });
+                      });
+
+                      const isBest = (campaign: string, metric: string, value: number) => {
+                        return value > 0 && value === maxValues[`${campaign}_${metric}`];
+                      };
+
+                      return paginatedData.map((row, idx) => (
+                        <tr key={idx} className="border-b border-border/50 hover:bg-muted/30">
+                          <td className="p-2 text-sm font-medium sticky left-0 bg-card z-10">
+                            {calendarView === 'week-numbers' && selectedCampaigns.length > 1 && granularity === 'weekly'
+                              ? row.weekLabel
+                              : granularity === 'daily' ? row.date : row.week}
+                          </td>
+                          {selectedCampaigns.map(campaign => {
+                            const status = row[`${campaign}_status`];
+                            const invitations = row[`${campaign}_invitations`] || 0;
+                            const connections = row[`${campaign}_connections`] || 0;
+                            const messages = row[`${campaign}_messages`] || 0;
+                            const positiveResponses = row[`${campaign}_positiveResponses`] || 0;
+                            const meetings = row[`${campaign}_meetings`] || 0;
+                            
+                            // For daily: check if any metric > 0
+                            // For weekly: check active days count
+                            const isActive = granularity === 'daily' 
+                              ? (invitations > 0 || connections > 0 || messages > 0)
+                              : typeof status === 'number' && status > 0;
+                            
+                            return (
+                              <React.Fragment key={campaign}>
+                                <td className="p-2 text-center border-l border-border">
+                                  {granularity === 'daily' ? (
+                                    <Badge 
+                                      variant={isActive ? "default" : "secondary"} 
+                                      className={`text-xs ${isActive ? 'bg-success text-success-foreground' : 'bg-muted text-muted-foreground'}`}
+                                    >
+                                      {isActive ? '● Ativo' : '○ Inativo'}
+                                    </Badge>
+                                  ) : (
+                                    <div className="flex items-center justify-center gap-1">
+                                      <span className={`inline-block w-2 h-2 rounded-full ${status > 0 ? 'bg-success' : 'bg-muted-foreground/30'}`} />
+                                      <span className="text-sm font-medium">{status}/7</span>
+                                    </div>
+                                  )}
                                 </td>
-                              )}
-                            </React.Fragment>
-                          );
-                        })}
-                      </tr>
-                    ))}
+                                <td className={`p-2 text-center text-sm ${invitations > 0 ? '' : 'text-muted-foreground'} ${isBest(campaign, 'invitations', invitations) ? 'bg-primary/15 font-bold text-primary' : ''}`}>
+                                  {invitations}
+                                  {isBest(campaign, 'invitations', invitations) && <span className="ml-1 text-xs">★</span>}
+                                </td>
+                                <td className={`p-2 text-center text-sm ${connections > 0 ? '' : 'text-muted-foreground'} ${isBest(campaign, 'connections', connections) ? 'bg-primary/15 font-bold text-primary' : ''}`}>
+                                  {connections}
+                                  {isBest(campaign, 'connections', connections) && <span className="ml-1 text-xs">★</span>}
+                                </td>
+                                <td className={`p-2 text-center text-sm ${messages > 0 ? '' : 'text-muted-foreground'} ${isBest(campaign, 'messages', messages) ? 'bg-primary/15 font-bold text-primary' : ''}`}>
+                                  {messages}
+                                  {isBest(campaign, 'messages', messages) && <span className="ml-1 text-xs">★</span>}
+                                </td>
+                                <td className={`p-2 text-center text-sm ${positiveResponses > 0 ? 'text-success font-medium' : 'text-muted-foreground'} ${isBest(campaign, 'positiveResponses', positiveResponses) ? 'bg-success/15 font-bold' : ''}`}>
+                                  {positiveResponses}
+                                  {isBest(campaign, 'positiveResponses', positiveResponses) && <span className="ml-1 text-xs">★</span>}
+                                </td>
+                                {granularity === 'weekly' && (
+                                  <td className={`p-2 text-center text-sm ${meetings > 0 ? 'text-primary font-medium' : 'text-muted-foreground'} ${isBest(campaign, 'meetings', meetings) ? 'bg-primary/15 font-bold' : ''}`}>
+                                    {meetings}
+                                    {isBest(campaign, 'meetings', meetings) && <span className="ml-1 text-xs">★</span>}
+                                  </td>
+                                )}
+                              </React.Fragment>
+                            );
+                          })}
+                        </tr>
+                      ));
+                    })()}
                   </tbody>
                 </table>
               </div>
