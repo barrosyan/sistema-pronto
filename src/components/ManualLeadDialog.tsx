@@ -37,13 +37,14 @@ export function ManualLeadDialog({
   const [formData, setFormData] = useState<Partial<Lead>>({
     status: 'pending',
     source: 'Kontax',
+    campaigns: [],
   });
 
   useEffect(() => {
     if (open) {
       loadCampaigns();
       // Reset form
-      setFormData({ status: 'pending', source: 'Kontax' });
+      setFormData({ status: 'pending', source: 'Kontax', campaigns: [] });
     }
   }, [open]);
 
@@ -58,9 +59,25 @@ export function ManualLeadDialog({
     }
   };
 
+  const selectedCampaigns = formData.campaigns || [];
+
+  const handleCampaignToggle = (campaign: string, checked: boolean) => {
+    let newCampaigns: string[];
+    if (checked) {
+      newCampaigns = [...selectedCampaigns, campaign];
+    } else {
+      newCampaigns = selectedCampaigns.filter(c => c !== campaign);
+    }
+    setFormData(prev => ({ 
+      ...prev, 
+      campaigns: newCampaigns,
+      campaign: newCampaigns[0] || ''
+    }));
+  };
+
   const handleSubmit = () => {
     // Validate required fields
-    if (!formData.name || !formData.campaign) {
+    if (!formData.name || selectedCampaigns.length === 0) {
       return;
     }
 
@@ -168,23 +185,24 @@ export function ManualLeadDialog({
             
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Campanha *</Label>
-                <div className="border rounded-md p-3 max-h-40 overflow-y-auto space-y-2">
+                <Label>Campanhas * <span className="text-xs text-muted-foreground">({selectedCampaigns.length} selecionada{selectedCampaigns.length !== 1 ? 's' : ''})</span></Label>
+                <div className="border rounded-md p-3 max-h-48 overflow-y-auto space-y-2">
                   {campaigns.length === 0 ? (
                     <p className="text-sm text-muted-foreground">Nenhuma campanha disponível</p>
                   ) : (
                     campaigns.map((campaign) => (
-                      <div key={campaign} className="flex items-center space-x-2">
+                      <div 
+                        key={campaign} 
+                        className={`flex items-center space-x-2 p-2 rounded-md transition-colors ${
+                          selectedCampaigns.includes(campaign) ? 'bg-primary/10' : 'hover:bg-muted'
+                        }`}
+                      >
                         <Checkbox
                           id={`manual-campaign-${campaign}`}
-                          checked={formData.campaign === campaign}
-                          onCheckedChange={(checked) => {
-                            if (checked) {
-                              handleInputChange('campaign', campaign);
-                            }
-                          }}
+                          checked={selectedCampaigns.includes(campaign)}
+                          onCheckedChange={(checked) => handleCampaignToggle(campaign, checked as boolean)}
                         />
-                        <Label htmlFor={`manual-campaign-${campaign}`} className="text-sm cursor-pointer">
+                        <Label htmlFor={`manual-campaign-${campaign}`} className="text-sm cursor-pointer flex-1">
                           {campaign}
                         </Label>
                       </div>
@@ -373,7 +391,7 @@ export function ManualLeadDialog({
           </Button>
           <Button 
             onClick={handleSubmit}
-            disabled={!formData.name || !formData.campaign}
+            disabled={!formData.name || selectedCampaigns.length === 0}
           >
             Salvar Lead
           </Button>

@@ -42,15 +42,34 @@ export const LeadEditDialog = ({ lead, open, onOpenChange, onSave }: LeadEditDia
   // Update editedLead when lead prop changes
   useEffect(() => {
     if (lead) {
-      setEditedLead(lead);
+      // Initialize campaigns array from single campaign field if needed
+      const campaigns = lead.campaigns || (lead.campaign ? [lead.campaign] : []);
+      setEditedLead({ ...lead, campaigns });
     }
   }, [lead]);
 
   if (!editedLead) return null;
 
+  const selectedCampaigns = editedLead.campaigns || (editedLead.campaign ? [editedLead.campaign] : []);
+
+  const handleCampaignToggle = (campaign: string, checked: boolean) => {
+    let newCampaigns: string[];
+    if (checked) {
+      newCampaigns = [...selectedCampaigns, campaign];
+    } else {
+      newCampaigns = selectedCampaigns.filter(c => c !== campaign);
+    }
+    // Keep campaign field as first selected for backward compatibility
+    setEditedLead({ 
+      ...editedLead, 
+      campaigns: newCampaigns,
+      campaign: newCampaigns[0] || ''
+    });
+  };
+
   const handleSave = () => {
-    if (!editedLead.name || !editedLead.campaign) {
-      toast.error('Nome e Campanha são obrigatórios');
+    if (!editedLead.name || selectedCampaigns.length === 0) {
+      toast.error('Nome e pelo menos uma Campanha são obrigatórios');
       return;
     }
     onSave(editedLead);
@@ -149,23 +168,24 @@ export const LeadEditDialog = ({ lead, open, onOpenChange, onSave }: LeadEditDia
           </div>
 
           <div className="space-y-2">
-            <Label>Campanha *</Label>
-            <div className="border rounded-md p-3 max-h-40 overflow-y-auto space-y-2">
+            <Label>Campanhas * <span className="text-xs text-muted-foreground">({selectedCampaigns.length} selecionada{selectedCampaigns.length !== 1 ? 's' : ''})</span></Label>
+            <div className="border rounded-md p-3 max-h-48 overflow-y-auto space-y-2">
               {availableCampaigns.length === 0 ? (
                 <p className="text-sm text-muted-foreground">Nenhuma campanha disponível</p>
               ) : (
                 availableCampaigns.map((campaign) => (
-                  <div key={campaign} className="flex items-center space-x-2">
+                  <div 
+                    key={campaign} 
+                    className={`flex items-center space-x-2 p-2 rounded-md transition-colors ${
+                      selectedCampaigns.includes(campaign) ? 'bg-primary/10' : 'hover:bg-muted'
+                    }`}
+                  >
                     <Checkbox
-                      id={`campaign-${campaign}`}
-                      checked={editedLead.campaign === campaign}
-                      onCheckedChange={(checked) => {
-                        if (checked) {
-                          setEditedLead({ ...editedLead, campaign });
-                        }
-                      }}
+                      id={`edit-campaign-${campaign}`}
+                      checked={selectedCampaigns.includes(campaign)}
+                      onCheckedChange={(checked) => handleCampaignToggle(campaign, checked as boolean)}
                     />
-                    <Label htmlFor={`campaign-${campaign}`} className="text-sm cursor-pointer">
+                    <Label htmlFor={`edit-campaign-${campaign}`} className="text-sm cursor-pointer flex-1">
                       {campaign}
                     </Label>
                   </div>
