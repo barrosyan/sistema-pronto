@@ -10,10 +10,13 @@ export interface HybridParsedData {
     totalLeads: number;
     invitesSent: number;
     connectionsAccepted: number;
+    messagesSent: number;
     followUps1Sent: number;
     followUps2Sent: number;
+    followUps3Sent: number;
     positiveResponses: number;
     negativeResponses: number;
+    pendingLeads: number;
     acceptanceRate: number; // Calculated as connectionsAccepted / invitesSent
   };
 }
@@ -148,11 +151,16 @@ export function parseHybridCsv(csvContent: string, campaignName: string = 'Campa
     connectionsAccepted: new Map<string, number>(),
     followUps1: new Map<string, number>(),
     followUps2: new Map<string, number>(),
+    followUps3: new Map<string, number>(),
+    positiveResponses: new Map<string, number>(),
+    negativeResponses: new Map<string, number>(),
+    messagesSent: new Map<string, number>(), // Sum of all follow-ups
   };
 
   const leads: any[] = [];
   let totalPositive = 0;
   let totalNegative = 0;
+  let totalPending = 0;
   
   // Count "Sim" responses for acceptance rate calculation
   let totalInvitesSim = 0;
@@ -257,14 +265,24 @@ export function parseHybridCsv(csvContent: string, campaignName: string = 'Campa
     let fu2Response: 'positive' | 'negative' | null = null;
     let fu2ResponseDate: string | null = null;
 
+    // Parse FU3 data (if exists)
+    let fu3Sent = false;
+    let fu3SendDate: string | null = null;
+    let fu3Response: 'positive' | 'negative' | null = null;
+    let fu3ResponseDate: string | null = null;
+
     for (const h of headers) {
       const normalized = normalizeColumnName(h);
       if (normalized === 'fu2' || normalized === 'fu_2' || normalized.includes('fu2')) {
         fu2Sent = isYes(row[h]);
       }
+      if (normalized === 'fu3' || normalized === 'fu_3' || normalized.includes('fu3')) {
+        fu3Sent = isYes(row[h]);
+      }
     }
 
-    // Continue counting for FU2
+    // Parse all dates and responses by position in headers
+    // Structure: FU1, Data de envio, Resposta, Data da resposta, FU2, Data de envio, Resposta, Data da resposta, etc.
     dateEnvioCount = 0;
     respostaCount = 0;
     dataRespostaCount = 0;
@@ -275,32 +293,49 @@ export function parseHybridCsv(csvContent: string, campaignName: string = 'Campa
       
       if (normalized.includes('data') && (normalized.includes('envio'))) {
         dateEnvioCount++;
-        if (dateEnvioCount === 3 && fu2Sent) {
+        if (dateEnvioCount === 2 && fu1Sent) {
+          fu1SendDate = parseDate(row[h]);
+        } else if (dateEnvioCount === 3 && fu2Sent) {
           fu2SendDate = parseDate(row[h]);
+        } else if (dateEnvioCount === 4 && fu3Sent) {
+          fu3SendDate = parseDate(row[h]);
         }
       }
       
       if (normalized === 'resposta' || normalized === 'response') {
         respostaCount++;
-        if (respostaCount === 2) {
+        if (respostaCount === 1) {
+          fu1Response = getResponseType(row[h]);
+        } else if (respostaCount === 2) {
           fu2Response = getResponseType(row[h]);
+        } else if (respostaCount === 3) {
+          fu3Response = getResponseType(row[h]);
         }
       }
       
       if (normalized.includes('data') && normalized.includes('resposta')) {
         dataRespostaCount++;
-        if (dataRespostaCount === 2) {
+        if (dataRespostaCount === 1) {
+          fu1ResponseDate = parseDate(row[h]);
+        } else if (dataRespostaCount === 2) {
           fu2ResponseDate = parseDate(row[h]);
+        } else if (dataRespostaCount === 3) {
+          fu3ResponseDate = parseDate(row[h]);
         }
       }
     }
 
-    // Determine overall response status
-    let overallResponse = fu2Response || fu1Response;
-    let responseDate = fu2ResponseDate || fu1ResponseDate;
+    // Determine overall response status - use the most recent response
+    let overallResponse = fu3Response || fu2Response || fu1Response;
+    let responseDate = fu3ResponseDate || fu2ResponseDate || fu1ResponseDate;
 
-    if (overallResponse === 'positive') totalPositive++;
-    if (overallResponse === 'negative') totalNegative++;
+    if (overallResponse === 'positive') {
+      totalPositive++;
+    } else if (overallResponse === 'negative') {
+      totalNegative++;
+    } else {
+      totalPending++;
+    }
 
     // Aggregate metrics by date
     if (inviteSent && inviteSendDate) {
@@ -313,14 +348,54 @@ export function parseHybridCsv(csvContent: string, campaignName: string = 'Campa
       metricsMap.connectionsAccepted.set(acceptDate, current + 1);
     }
 
+    // Track follow-ups by their send dates
     if (fu1Sent && fu1SendDate) {
       const current = metricsMap.followUps1.get(fu1SendDate) || 0;
       metricsMap.followUps1.set(fu1SendDate, current + 1);
+      // Also add to messages sent
+      const msgCurrent = metricsMap.messagesSent.get(fu1SendDate) || 0;
+      metricsMap.messagesSent.set(fu1SendDate, msgCurrent + 1);
     }
 
     if (fu2Sent && fu2SendDate) {
       const current = metricsMap.followUps2.get(fu2SendDate) || 0;
       metricsMap.followUps2.set(fu2SendDate, current + 1);
+      // Also add to messages sent
+      const msgCurrent = metricsMap.messagesSent.get(fu2SendDate) || 0;
+      metricsMap.messagesSent.set(fu2SendDate, msgCurrent + 1);
+    }
+
+    if (fu3Sent && fu3SendDate) {
+      const current = metricsMap.followUps3.get(fu3SendDate) || 0;
+      metricsMap.followUps3.set(fu3SendDate, current + 1);
+      // Also add to messages sent
+      const msgCurrent = metricsMap.messagesSent.get(fu3SendDate) || 0;
+      metricsMap.messagesSent.set(fu3SendDate, msgCurrent + 1);
+    }
+
+    // Track positive/negative responses by their response dates
+    if (fu1Response === 'positive' && fu1ResponseDate) {
+      const current = metricsMap.positiveResponses.get(fu1ResponseDate) || 0;
+      metricsMap.positiveResponses.set(fu1ResponseDate, current + 1);
+    } else if (fu1Response === 'negative' && fu1ResponseDate) {
+      const current = metricsMap.negativeResponses.get(fu1ResponseDate) || 0;
+      metricsMap.negativeResponses.set(fu1ResponseDate, current + 1);
+    }
+
+    if (fu2Response === 'positive' && fu2ResponseDate) {
+      const current = metricsMap.positiveResponses.get(fu2ResponseDate) || 0;
+      metricsMap.positiveResponses.set(fu2ResponseDate, current + 1);
+    } else if (fu2Response === 'negative' && fu2ResponseDate) {
+      const current = metricsMap.negativeResponses.get(fu2ResponseDate) || 0;
+      metricsMap.negativeResponses.set(fu2ResponseDate, current + 1);
+    }
+
+    if (fu3Response === 'positive' && fu3ResponseDate) {
+      const current = metricsMap.positiveResponses.get(fu3ResponseDate) || 0;
+      metricsMap.positiveResponses.set(fu3ResponseDate, current + 1);
+    } else if (fu3Response === 'negative' && fu3ResponseDate) {
+      const current = metricsMap.negativeResponses.get(fu3ResponseDate) || 0;
+      metricsMap.negativeResponses.set(fu3ResponseDate, current + 1);
     }
 
     // Create lead record - classify based on "Resposta" field
@@ -349,11 +424,14 @@ export function parseHybridCsv(csvContent: string, campaignName: string = 'Campa
       followUp1Comments: fu1Response ? `Resposta: ${fu1Response === 'positive' ? 'Positiva' : 'Negativa'}` : null,
       followUp2Date: fu2SendDate,
       followUp2Comments: fu2Response ? `Resposta: ${fu2Response === 'positive' ? 'Positiva' : 'Negativa'}` : null,
+      followUp3Date: fu3SendDate,
+      followUp3Comments: fu3Response ? `Resposta: ${fu3Response === 'positive' ? 'Positiva' : 'Negativa'}` : null,
       inviteSent,
       inviteSendDate,
       connectionAccepted,
       isPositive: overallResponse === 'positive',
       isNegative: overallResponse === 'negative',
+      isPending: !overallResponse,
     };
 
     leads.push(lead);
@@ -370,12 +448,28 @@ export function parseHybridCsv(csvContent: string, campaignName: string = 'Campa
       dailyData: Object.fromEntries(metricsMap.connectionsAccepted),
     },
     {
+      eventType: 'Messages Sent',
+      dailyData: Object.fromEntries(metricsMap.messagesSent),
+    },
+    {
       eventType: 'Follow-Ups 1',
       dailyData: Object.fromEntries(metricsMap.followUps1),
     },
     {
       eventType: 'Follow-Ups 2',
       dailyData: Object.fromEntries(metricsMap.followUps2),
+    },
+    {
+      eventType: 'Follow-Ups 3',
+      dailyData: Object.fromEntries(metricsMap.followUps3),
+    },
+    {
+      eventType: 'Positive Responses',
+      dailyData: Object.fromEntries(metricsMap.positiveResponses),
+    },
+    {
+      eventType: 'Negative Responses',
+      dailyData: Object.fromEntries(metricsMap.negativeResponses),
     },
   ];
 
@@ -386,10 +480,13 @@ export function parseHybridCsv(csvContent: string, campaignName: string = 'Campa
     totalLeads: leads.length,
     invitesSent: totalInvitesSim, // Use count of "Sim" in Invite column
     connectionsAccepted: totalAceitoSim, // Use count of "Sim" in Aceito column
+    messagesSent: Array.from(metricsMap.messagesSent.values()).reduce((a, b) => a + b, 0),
     followUps1Sent: Array.from(metricsMap.followUps1.values()).reduce((a, b) => a + b, 0),
     followUps2Sent: Array.from(metricsMap.followUps2.values()).reduce((a, b) => a + b, 0),
+    followUps3Sent: Array.from(metricsMap.followUps3.values()).reduce((a, b) => a + b, 0),
     positiveResponses: totalPositive,
     negativeResponses: totalNegative,
+    pendingLeads: totalPending,
     acceptanceRate: Math.round(acceptanceRate * 100) / 100, // Round to 2 decimal places
   };
 
