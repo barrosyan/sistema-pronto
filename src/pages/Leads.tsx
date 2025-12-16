@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Upload, Search, Filter, Users, Edit, Plus, ArrowUpDown, ArrowUp, ArrowDown, Download } from 'lucide-react';
+import { Upload, Search, Filter, Users, Edit, Plus, ArrowUpDown, ArrowUp, ArrowDown, Download, ThumbsUp, ThumbsDown, CheckSquare } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
@@ -37,7 +37,7 @@ type SortField = 'name' | 'position' | 'company' | 'campaign' | 'status' | 'conn
 type SortOrder = 'asc' | 'desc';
 
 const Leads = () => {
-  const { positiveLeads, negativeLeads, pendingLeads, setPositiveLeads, setNegativeLeads, updateLead, addPositiveLead } = useCampaignData();
+  const { positiveLeads, negativeLeads, pendingLeads, setPositiveLeads, setNegativeLeads, updateLead, addPositiveLead, loadFromDatabase } = useCampaignData();
   const allLeads = [...positiveLeads, ...negativeLeads, ...pendingLeads];
   const [searchTerm, setSearchTerm] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -49,6 +49,7 @@ const Leads = () => {
   const [sortOrder, setSortOrder] = useState<SortOrder>('asc');
   const [selectedCampaigns, setSelectedCampaigns] = useState<string[]>([]);
   const [showCampaignFilter, setShowCampaignFilter] = useState(false);
+  const [selectedLeads, setSelectedLeads] = useState<string[]>([]);
 
   // Get unique campaign names from leads
   const availableCampaigns = Array.from(new Set(allLeads.map(lead => lead.campaign).filter(Boolean)));
@@ -68,6 +69,85 @@ const Leads = () => {
 
   const clearCampaignSelection = () => {
     setSelectedCampaigns([]);
+  };
+
+  // Lead selection handlers
+  const toggleLeadSelection = (leadId: string) => {
+    setSelectedLeads(prev => 
+      prev.includes(leadId) 
+        ? prev.filter(id => id !== leadId)
+        : [...prev, leadId]
+    );
+  };
+
+  const selectAllVisibleLeads = () => {
+    const visibleIds = paginatedLeads.map(l => l.id);
+    setSelectedLeads(prev => {
+      const newSelection = [...prev];
+      visibleIds.forEach(id => {
+        if (!newSelection.includes(id)) {
+          newSelection.push(id);
+        }
+      });
+      return newSelection;
+    });
+  };
+
+  const clearLeadSelection = () => {
+    setSelectedLeads([]);
+  };
+
+  const selectAllFilteredLeads = () => {
+    setSelectedLeads(filteredLeads.map(l => l.id));
+  };
+
+  // Quick status change handlers
+  const handleQuickStatusChange = async (leadId: string, newStatus: 'positive' | 'negative') => {
+    await updateLead(leadId, { status: newStatus });
+    toast.success(`Lead marcado como ${newStatus === 'positive' ? 'positivo' : 'negativo'}`);
+  };
+
+  const handleBulkStatusChange = async (newStatus: 'positive' | 'negative') => {
+    if (selectedLeads.length === 0) {
+      toast.warning('Selecione pelo menos um lead');
+      return;
+    }
+    
+    setIsLoading(true);
+    try {
+      for (const leadId of selectedLeads) {
+        await updateLead(leadId, { status: newStatus });
+      }
+      toast.success(`${selectedLeads.length} leads marcados como ${newStatus === 'positive' ? 'positivos' : 'negativos'}`);
+      setSelectedLeads([]);
+    } catch (error) {
+      toast.error('Erro ao atualizar leads');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleMarkAllAs = async (newStatus: 'positive' | 'negative') => {
+    if (filteredLeads.length === 0) {
+      toast.warning('Nenhum lead para atualizar');
+      return;
+    }
+    
+    const confirmMessage = `Tem certeza que deseja marcar TODOS os ${filteredLeads.length} leads filtrados como ${newStatus === 'positive' ? 'positivos' : 'negativos'}?`;
+    if (!confirm(confirmMessage)) return;
+    
+    setIsLoading(true);
+    try {
+      for (const lead of filteredLeads) {
+        await updateLead(lead.id, { status: newStatus });
+      }
+      toast.success(`${filteredLeads.length} leads marcados como ${newStatus === 'positive' ? 'positivos' : 'negativos'}`);
+      setSelectedLeads([]);
+    } catch (error) {
+      toast.error('Erro ao atualizar leads');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -353,6 +433,83 @@ const Leads = () => {
             </Card>
           )}
 
+          {/* Bulk Actions */}
+          <Card className="bg-muted/30">
+            <CardContent className="py-3">
+              <div className="flex items-center justify-between flex-wrap gap-3">
+                <div className="flex items-center gap-2">
+                  <CheckSquare className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm text-muted-foreground">
+                    {selectedLeads.length > 0 
+                      ? `${selectedLeads.length} lead(s) selecionado(s)`
+                      : 'Nenhum lead selecionado'}
+                  </span>
+                  {selectedLeads.length > 0 && (
+                    <Button variant="ghost" size="sm" onClick={clearLeadSelection}>
+                      Limpar seleção
+                    </Button>
+                  )}
+                </div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={selectAllVisibleLeads}
+                  >
+                    Selecionar Página
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={selectAllFilteredLeads}
+                  >
+                    Selecionar Todos ({filteredLeads.length})
+                  </Button>
+                  <div className="h-4 w-px bg-border mx-1" />
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => handleBulkStatusChange('positive')}
+                    disabled={selectedLeads.length === 0 || isLoading}
+                    className="text-success border-success/30 hover:bg-success/10"
+                  >
+                    <ThumbsUp className="h-4 w-4 mr-1" />
+                    Positivar Selecionados
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => handleBulkStatusChange('negative')}
+                    disabled={selectedLeads.length === 0 || isLoading}
+                    className="text-destructive border-destructive/30 hover:bg-destructive/10"
+                  >
+                    <ThumbsDown className="h-4 w-4 mr-1" />
+                    Negativar Selecionados
+                  </Button>
+                  <div className="h-4 w-px bg-border mx-1" />
+                  <Button 
+                    variant="ghost" 
+                    size="sm"
+                    onClick={() => handleMarkAllAs('positive')}
+                    disabled={isLoading}
+                    className="text-success hover:bg-success/10"
+                  >
+                    Todos Positivos
+                  </Button>
+                  <Button 
+                    variant="ghost" 
+                    size="sm"
+                    onClick={() => handleMarkAllAs('negative')}
+                    disabled={isLoading}
+                    className="text-destructive hover:bg-destructive/10"
+                  >
+                    Todos Negativos
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between">
@@ -366,17 +523,24 @@ const Leads = () => {
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead className="w-12">
+                      <Checkbox 
+                        checked={paginatedLeads.length > 0 && paginatedLeads.every(l => selectedLeads.includes(l.id))}
+                        onCheckedChange={(checked) => {
+                          if (checked) {
+                            selectAllVisibleLeads();
+                          } else {
+                            const visibleIds = paginatedLeads.map(l => l.id);
+                            setSelectedLeads(prev => prev.filter(id => !visibleIds.includes(id)));
+                          }
+                        }}
+                      />
+                    </TableHead>
                     <TableHead 
                       className="cursor-pointer select-none"
                       onClick={() => handleSort('name')}
                     >
                       Nome {getSortIcon('name')}
-                    </TableHead>
-                    <TableHead 
-                      className="cursor-pointer select-none"
-                      onClick={() => handleSort('position')}
-                    >
-                      Cargo {getSortIcon('position')}
                     </TableHead>
                     <TableHead 
                       className="cursor-pointer select-none"
@@ -390,52 +554,53 @@ const Leads = () => {
                     >
                       Campanha {getSortIcon('campaign')}
                     </TableHead>
-                    <TableHead>Source</TableHead>
                     <TableHead 
                       className="cursor-pointer select-none"
                       onClick={() => handleSort('status')}
                     >
                       Status {getSortIcon('status')}
                     </TableHead>
-                    <TableHead 
-                      className="cursor-pointer select-none"
-                      onClick={() => handleSort('connectionDate')}
-                    >
-                      Data Conexão {getSortIcon('connectionDate')}
-                    </TableHead>
-                    <TableHead>LinkedIn</TableHead>
+                    <TableHead className="text-center">Ação Rápida</TableHead>
                     <TableHead>Ações</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {paginatedLeads.map((lead) => (
-                    <TableRow key={lead.id}>
+                    <TableRow 
+                      key={lead.id}
+                      className={selectedLeads.includes(lead.id) ? 'bg-primary/5' : ''}
+                    >
+                      <TableCell>
+                        <Checkbox 
+                          checked={selectedLeads.includes(lead.id)}
+                          onCheckedChange={() => toggleLeadSelection(lead.id)}
+                        />
+                      </TableCell>
                       <TableCell className="font-medium">{lead.name}</TableCell>
-                      <TableCell>{lead.position}</TableCell>
                       <TableCell>{lead.company}</TableCell>
                       <TableCell>{lead.campaign}</TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className="text-xs">
-                          {lead.source || 'N/A'}
-                        </Badge>
-                      </TableCell>
                       <TableCell>{getStatusBadge(lead.status)}</TableCell>
                       <TableCell>
-                        {lead.connectionDate 
-                          ? (lead.connectionDate && !isNaN(new Date(lead.connectionDate).getTime())
-                              ? new Date(lead.connectionDate).toLocaleDateString('pt-BR')
-                              : 'Data inválida')
-                          : '-'}
-                      </TableCell>
-                      <TableCell>
-                        <a 
-                          href={lead.linkedin} 
-                          target="_blank" 
-                          rel="noopener noreferrer"
-                          className="text-primary hover:underline"
-                        >
-                          Ver Perfil
-                        </a>
+                        <div className="flex items-center justify-center gap-1">
+                          <Button 
+                            variant={lead.status === 'positive' ? 'default' : 'outline'}
+                            size="sm"
+                            className={`h-8 w-8 p-0 ${lead.status === 'positive' ? 'bg-success hover:bg-success/90' : 'text-success border-success/30 hover:bg-success/10'}`}
+                            onClick={() => handleQuickStatusChange(lead.id, 'positive')}
+                            title="Marcar como Positivo"
+                          >
+                            <ThumbsUp className="h-4 w-4" />
+                          </Button>
+                          <Button 
+                            variant={lead.status === 'negative' ? 'default' : 'outline'}
+                            size="sm"
+                            className={`h-8 w-8 p-0 ${lead.status === 'negative' ? 'bg-destructive hover:bg-destructive/90' : 'text-destructive border-destructive/30 hover:bg-destructive/10'}`}
+                            onClick={() => handleQuickStatusChange(lead.id, 'negative')}
+                            title="Marcar como Negativo"
+                          >
+                            <ThumbsDown className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </TableCell>
                       <TableCell>
                         <Button 
@@ -443,7 +608,7 @@ const Leads = () => {
                           size="sm"
                           onClick={() => handleEditLead(lead)}
                         >
-                          <Edit className="h-4 w-4 mr-2" />
+                          <Edit className="h-4 w-4 mr-1" />
                           Editar
                         </Button>
                       </TableCell>
