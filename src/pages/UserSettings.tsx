@@ -867,6 +867,13 @@ export default function UserSettings() {
 
           // Insert leads from hybrid format
           if (leads.length > 0) {
+            // Log lead statuses for debugging
+            const statusCounts = leads.reduce((acc: any, lead: any) => {
+              acc[lead.status] = (acc[lead.status] || 0) + 1;
+              return acc;
+            }, {});
+            console.log('📊 Lead status distribution:', statusCounts);
+            
             const leadsToInsert = leads.map((lead: any) => ({
               user_id: user.id,
               campaign: campaignName,
@@ -874,7 +881,7 @@ export default function UserSettings() {
               name: lead.name,
               position: lead.position,
               company: lead.company,
-              status: lead.status,
+              status: lead.status || 'pending', // Use lead's status from parser
               source: lead.source,
               connection_date: lead.connectionDate,
               positive_response_date: lead.positiveResponseDate,
@@ -883,6 +890,8 @@ export default function UserSettings() {
               follow_up_1_comments: lead.followUp1Comments,
               follow_up_2_date: lead.followUp2Date,
               follow_up_2_comments: lead.followUp2Comments,
+              follow_up_3_date: lead.followUp3Date,
+              follow_up_3_comments: lead.followUp3Comments,
             }));
 
             // Deduplicate leads
