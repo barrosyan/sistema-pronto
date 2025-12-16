@@ -18,6 +18,7 @@ interface CampaignMetricsData {
   comentarios: number;
   totalAtividades: number;
   respostasPositivas: number;
+  respostasNegativas: number;
   leadsProcessados: number;
   reunioes: number;
   propostas: number;
@@ -75,6 +76,7 @@ export function CampaignPivotTable({ campaigns }: CampaignPivotTableProps) {
     comentarios: campaigns.reduce((sum, c) => sum + c.comentarios, 0),
     totalAtividades: campaigns.reduce((sum, c) => sum + c.totalAtividades, 0),
     respostasPositivas: campaigns.reduce((sum, c) => sum + c.respostasPositivas, 0),
+    respostasNegativas: campaigns.reduce((sum, c) => sum + (c.respostasNegativas || 0), 0),
     leadsProcessados: campaigns.reduce((sum, c) => sum + c.leadsProcessados, 0),
     reunioes: campaigns.reduce((sum, c) => sum + c.reunioes, 0),
     propostas: campaigns.reduce((sum, c) => sum + c.propostas, 0),

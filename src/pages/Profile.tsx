@@ -17,6 +17,40 @@ import { format, parseISO, startOfWeek, endOfWeek } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { CalendarDays } from 'lucide-react';
 
+// Helper function to classify lead response type based on status and comments fields
+const getLeadResponseType = (lead: any): 'positive' | 'negative' | 'pending' => {
+  // Check explicit status first
+  if (lead.status === 'positive') return 'positive';
+  if (lead.status === 'negative') return 'negative';
+  
+  // Check follow-up comments for response classification (hybrid CSV format)
+  const commentsToCheck = [
+    lead.followUp1Comments || lead.follow_up_1_comments,
+    lead.followUp2Comments || lead.follow_up_2_comments,
+    lead.followUp3Comments || lead.follow_up_3_comments,
+    lead.comments,
+    lead.statusDetails || lead.status_details
+  ].filter(Boolean);
+  
+  for (const comment of commentsToCheck) {
+    const normalized = comment.toLowerCase().trim();
+    // Check for positive indicators
+    if (normalized.includes('positiv') || normalized === 'sim' || normalized === 'yes') {
+      return 'positive';
+    }
+    // Check for negative indicators
+    if (normalized.includes('negativ') || normalized === 'não' || normalized === 'nao' || normalized === 'no') {
+      return 'negative';
+    }
+  }
+  
+  // Check positive/negative response dates
+  if (lead.positiveResponseDate || lead.positive_response_date) return 'positive';
+  if (lead.negativeResponseDate || lead.negative_response_date) return 'negative';
+  
+  return 'pending';
+};
+
 export default function Profile() {
   const { campaignMetrics, getAllLeads, loadFromDatabase, isLoading } = useCampaignData();
   const { selectedProfiles, availableProfiles } = useProfileFilter();
@@ -145,7 +179,8 @@ export default function Profile() {
       totals.mensagensEnviadas = followUpsTotal;
     }
 
-    const positiveLeads = filteredLeads.filter(l => l.status === 'positive');
+    const positiveLeads = filteredLeads.filter(l => getLeadResponseType(l) === 'positive');
+    const negativeLeads = filteredLeads.filter(l => getLeadResponseType(l) === 'negative');
     const reunioes = positiveLeads.filter(l => l.meetingDate).length;
     const propostas = positiveLeads.filter(l => l.proposalDate).length;
     const vendas = positiveLeads.filter(l => l.saleDate).length;
@@ -196,7 +231,7 @@ export default function Profile() {
       );
       
       const campaignLeads = allLeads.filter(l => l.campaign === campaignName);
-      const positiveLeads = campaignLeads.filter(l => l.status === 'positive');
+      const positiveLeads = campaignLeads.filter(l => getLeadResponseType(l) === 'positive');
 
       // Get profile for this campaign
       const profile = campaignMetricsData[0]?.profileName || '-';
@@ -266,7 +301,8 @@ export default function Profile() {
       );
       
       const campaignLeads = allLeads.filter(l => l.campaign === campaignName);
-      const positiveLeads = campaignLeads.filter(l => l.status === 'positive');
+      const positiveLeads = campaignLeads.filter(l => getLeadResponseType(l) === 'positive');
+      const negativeLeads = campaignLeads.filter(l => getLeadResponseType(l) === 'negative');
 
       let convites = 0, conexoes = 0, mensagens = 0, visitas = 0, likes = 0, comentarios = 0;
       let followUps1 = 0, followUps2 = 0, followUps3 = 0;
@@ -324,6 +360,7 @@ export default function Profile() {
         comentarios,
         totalAtividades: convites + conexoes + mensagens + visitas + likes + comentarios,
         respostasPositivas: positiveLeads.length,
+        respostasNegativas: negativeLeads.length,
         leadsProcessados: campaignLeads.length,
         reunioes: positiveLeads.filter(l => l.meetingDate).length,
         propostas: positiveLeads.filter(l => l.proposalDate).length,
