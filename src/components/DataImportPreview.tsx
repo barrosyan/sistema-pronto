@@ -33,6 +33,7 @@ export interface FilePreviewData {
   positiveLeadsCount: number;
   negativeLeadsCount: number;
   pendingLeadsCount?: number;
+  messagesSent?: number;
   campaignNames: string[];
   campaignProfileMappings?: CampaignProfileMapping[];
   error?: string;
@@ -212,6 +213,12 @@ export default function DataImportPreview({
                             <div className="flex justify-between">
                               <span className="text-muted-foreground">Leads Pendentes:</span>
                               <span className="font-medium text-yellow-600">{file.pendingLeadsCount}</span>
+                            </div>
+                          )}
+                          {file.messagesSent !== undefined && file.messagesSent > 0 && (
+                            <div className="flex justify-between">
+                              <span className="text-muted-foreground">Mensagens Enviadas:</span>
+                              <span className="font-medium text-purple-600">{file.messagesSent}</span>
                             </div>
                           )}
                           {file.acceptanceRate !== undefined && (
