@@ -19,7 +19,7 @@ import { CalendarDays } from 'lucide-react';
 
 export default function Profile() {
   const { campaignMetrics, getAllLeads, loadFromDatabase, isLoading } = useCampaignData();
-  const { selectedProfile, availableProfiles } = useProfileFilter();
+  const { selectedProfiles, availableProfiles } = useProfileFilter();
   const { selectedUserIds } = useAdminUser();
   const [selectedCampaign, setSelectedCampaign] = useState<string>('all');
 
@@ -27,19 +27,19 @@ export default function Profile() {
     loadFromDatabase(selectedUserIds.length > 0 ? selectedUserIds : undefined);
   }, [loadFromDatabase, selectedUserIds]);
 
-  // Extract unique campaigns from database - filter by selected profile
+  // Extract unique campaigns from database - filter by selected profiles
   const uniqueCampaigns = Array.from(
     new Set(
       campaignMetrics
-        .filter(m => !selectedProfile || m.profileName === selectedProfile)
+        .filter(m => selectedProfiles.length === 0 || selectedProfiles.includes(m.profileName))
         .map(m => m.campaignName)
         .filter(Boolean)
     )
   );
 
-  // Filter metrics and leads based on selected campaign AND selected profile
+  // Filter metrics and leads based on selected campaign AND selected profiles
   const filteredMetrics = campaignMetrics.filter(m => {
-    const matchesProfile = !selectedProfile || m.profileName === selectedProfile;
+    const matchesProfile = selectedProfiles.length === 0 || selectedProfiles.includes(m.profileName);
     const matchesCampaign = selectedCampaign === 'all' || m.campaignName === selectedCampaign;
     return matchesProfile && matchesCampaign;
   });
@@ -49,12 +49,12 @@ export default function Profile() {
     ? allLeads
     : allLeads.filter(l => l.campaign === selectedCampaign);
 
-  // Reset selected campaign when profile changes if it's not available
+  // Reset selected campaign when profiles change if it's not available
   useEffect(() => {
     if (selectedCampaign !== 'all' && !uniqueCampaigns.includes(selectedCampaign)) {
       setSelectedCampaign('all');
     }
-  }, [selectedProfile, uniqueCampaigns, selectedCampaign]);
+  }, [selectedProfiles, uniqueCampaigns, selectedCampaign]);
 
   // Calculate date range from metrics
   // Start = first date with any value > 0
@@ -192,7 +192,7 @@ export default function Profile() {
     return uniqueCampaigns.map(campaignName => {
       const campaignMetricsData = campaignMetrics.filter(m => 
         m.campaignName === campaignName && 
-        (!selectedProfile || m.profileName === selectedProfile)
+        (selectedProfiles.length === 0 || selectedProfiles.includes(m.profileName))
       );
       
       const campaignLeads = allLeads.filter(l => l.campaign === campaignName);
@@ -262,7 +262,7 @@ export default function Profile() {
     return uniqueCampaigns.map(campaignName => {
       const campaignMetricsData = campaignMetrics.filter(m => 
         m.campaignName === campaignName && 
-        (!selectedProfile || m.profileName === selectedProfile)
+        (selectedProfiles.length === 0 || selectedProfiles.includes(m.profileName))
       );
       
       const campaignLeads = allLeads.filter(l => l.campaign === campaignName);
@@ -801,7 +801,7 @@ export default function Profile() {
       <ExportOptions 
         data={[{
           Campanha: selectedCampaign === 'all' ? 'Todas' : selectedCampaign,
-          Perfil: selectedProfile || 'Todos',
+          Perfil: selectedProfiles.length > 0 ? selectedProfiles.join(', ') : 'Todos',
           'Data Início': formatDate(dateRange.startDate),
           'Data Fim': formatDate(dateRange.endDate),
           'Dias Ativos': dateRange.activeDays,
@@ -823,7 +823,7 @@ export default function Profile() {
           'Taxa Reuniões/Resp. Positivas': `${conversionRates.numeroDeReunioesRespostasPositivas}%`,
           'Taxa Reuniões/Convites': `${conversionRates.numeroDeReunioesConvitesEnviados}%`,
         }]}
-        filename={`perfil-${selectedProfile || 'todos'}-${selectedCampaign === 'all' ? 'todas-campanhas' : selectedCampaign}-${new Date().toISOString().split('T')[0]}`}
+        filename={`perfil-${selectedProfiles.length > 0 ? selectedProfiles.join('-') : 'todos'}-${selectedCampaign === 'all' ? 'todas-campanhas' : selectedCampaign}-${new Date().toISOString().split('T')[0]}`}
       />
     </div>
   );
