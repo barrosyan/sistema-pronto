@@ -17,6 +17,31 @@ import { format, parseISO, startOfWeek, endOfWeek } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { CalendarDays } from 'lucide-react';
 
+// Helper function to normalize campaign names for matching
+const normalizeCampaignName = (name: string): string => {
+  return name
+    .toLowerCase()
+    .replace(/\s+all\s*leads\.?csv$/i, '')
+    .replace(/\s+all\s*leads$/i, '')
+    .replace(/\.csv$/i, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+};
+
+// Helper function to check if a lead belongs to a campaign (fuzzy matching)
+const leadBelongsToCampaign = (leadCampaign: string, campaignName: string): boolean => {
+  const normalizedLead = normalizeCampaignName(leadCampaign);
+  const normalizedCampaign = normalizeCampaignName(campaignName);
+  
+  // Exact match after normalization
+  if (normalizedLead === normalizedCampaign) return true;
+  
+  // One contains the other
+  if (normalizedLead.includes(normalizedCampaign) || normalizedCampaign.includes(normalizedLead)) return true;
+  
+  return false;
+};
+
 // Helper function to classify lead response type based on status and comments fields
 const getLeadResponseType = (lead: any): 'positive' | 'negative' | 'pending' => {
   // Check explicit status first
@@ -28,6 +53,7 @@ const getLeadResponseType = (lead: any): 'positive' | 'negative' | 'pending' => 
     lead.followUp1Comments || lead.follow_up_1_comments,
     lead.followUp2Comments || lead.follow_up_2_comments,
     lead.followUp3Comments || lead.follow_up_3_comments,
+    lead.followUp4Comments || lead.follow_up_4_comments,
     lead.comments,
     lead.statusDetails || lead.status_details
   ].filter(Boolean);
@@ -35,11 +61,11 @@ const getLeadResponseType = (lead: any): 'positive' | 'negative' | 'pending' => 
   for (const comment of commentsToCheck) {
     const normalized = comment.toLowerCase().trim();
     // Check for positive indicators
-    if (normalized.includes('positiv') || normalized === 'sim' || normalized === 'yes') {
+    if (normalized.includes('positiv') || normalized === 'sim' || normalized === 'yes' || normalized.includes('resposta: positiva')) {
       return 'positive';
     }
     // Check for negative indicators
-    if (normalized.includes('negativ') || normalized === 'não' || normalized === 'nao' || normalized === 'no') {
+    if (normalized.includes('negativ') || normalized === 'não' || normalized === 'nao' || normalized === 'no' || normalized.includes('resposta: negativa')) {
       return 'negative';
     }
   }
@@ -81,7 +107,7 @@ export default function Profile() {
   const allLeads = getAllLeads();
   const filteredLeads = selectedCampaign === 'all'
     ? allLeads
-    : allLeads.filter(l => l.campaign === selectedCampaign);
+    : allLeads.filter(l => leadBelongsToCampaign(l.campaign, selectedCampaign));
 
   // Reset selected campaign when profiles change if it's not available
   useEffect(() => {
@@ -230,7 +256,7 @@ export default function Profile() {
         (selectedProfiles.length === 0 || selectedProfiles.includes(m.profileName))
       );
       
-      const campaignLeads = allLeads.filter(l => l.campaign === campaignName);
+      const campaignLeads = allLeads.filter(l => leadBelongsToCampaign(l.campaign, campaignName));
       const positiveLeads = campaignLeads.filter(l => getLeadResponseType(l) === 'positive');
 
       // Get profile for this campaign
@@ -300,7 +326,7 @@ export default function Profile() {
         (selectedProfiles.length === 0 || selectedProfiles.includes(m.profileName))
       );
       
-      const campaignLeads = allLeads.filter(l => l.campaign === campaignName);
+      const campaignLeads = allLeads.filter(l => leadBelongsToCampaign(l.campaign, campaignName));
       const positiveLeads = campaignLeads.filter(l => getLeadResponseType(l) === 'positive');
       const negativeLeads = campaignLeads.filter(l => getLeadResponseType(l) === 'negative');
 
