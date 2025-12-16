@@ -399,14 +399,14 @@ export function parseHybridCsv(csvContent: string, campaignName: string = 'Campa
     }
 
     // Create lead record - classify based on "Resposta" field
-    // "Resposta positiva" = positive lead (follow-up status)
-    // "Resposta negativa" = negative lead (sem-interesse status)
+    // "Resposta positiva" = positive lead (positive status)
+    // "Resposta negativa" = negative lead (negative status)
     // No response yet = pending lead
     let leadStatus = 'pending';
     if (overallResponse === 'positive') {
-      leadStatus = 'follow-up';
+      leadStatus = 'positive'; // Changed from 'follow-up' to 'positive'
     } else if (overallResponse === 'negative') {
-      leadStatus = 'sem-interesse';
+      leadStatus = 'negative'; // Changed from 'sem-interesse' to 'negative'
     }
 
     const lead = {
