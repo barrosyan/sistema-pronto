@@ -55,6 +55,31 @@ interface WeeklyData {
   totalDays: number;
 }
 
+// Helper function to normalize campaign names for matching
+const normalizeCampaignName = (name: string): string => {
+  return name
+    .toLowerCase()
+    .replace(/\s+all\s*leads\.?csv$/i, '')
+    .replace(/\s+all\s*leads$/i, '')
+    .replace(/\.csv$/i, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+};
+
+// Helper function to check if a lead belongs to a campaign (fuzzy matching)
+const leadBelongsToCampaign = (leadCampaign: string, campaignName: string): boolean => {
+  const normalizedLead = normalizeCampaignName(leadCampaign);
+  const normalizedCampaign = normalizeCampaignName(campaignName);
+  
+  // Exact match after normalization
+  if (normalizedLead === normalizedCampaign) return true;
+  
+  // One contains the other
+  if (normalizedLead.includes(normalizedCampaign) || normalizedCampaign.includes(normalizedLead)) return true;
+  
+  return false;
+};
+
 // Helper function to classify lead response type based on status and comments fields
 const getLeadResponseType = (lead: any): 'positive' | 'negative' | 'pending' => {
   // Check explicit status first
@@ -66,6 +91,7 @@ const getLeadResponseType = (lead: any): 'positive' | 'negative' | 'pending' => 
     lead.followUp1Comments || lead.follow_up_1_comments,
     lead.followUp2Comments || lead.follow_up_2_comments,
     lead.followUp3Comments || lead.follow_up_3_comments,
+    lead.followUp4Comments || lead.follow_up_4_comments,
     lead.comments,
     lead.statusDetails || lead.status_details
   ].filter(Boolean);
@@ -73,11 +99,11 @@ const getLeadResponseType = (lead: any): 'positive' | 'negative' | 'pending' => 
   for (const comment of commentsToCheck) {
     const normalized = comment.toLowerCase().trim();
     // Check for positive indicators
-    if (normalized.includes('positiv') || normalized === 'sim' || normalized === 'yes') {
+    if (normalized.includes('positiv') || normalized === 'sim' || normalized === 'yes' || normalized.includes('resposta: positiva')) {
       return 'positive';
     }
     // Check for negative indicators
-    if (normalized.includes('negativ') || normalized === 'não' || normalized === 'nao' || normalized === 'no') {
+    if (normalized.includes('negativ') || normalized === 'não' || normalized === 'nao' || normalized === 'no' || normalized.includes('resposta: negativa')) {
       return 'negative';
     }
   }
@@ -306,7 +332,7 @@ export default function Campaigns() {
       }
     });
 
-    const leads = getAllLeads().filter(l => l.campaign === campaignName);
+    const leads = getAllLeads().filter(l => leadBelongsToCampaign(l.campaign, campaignName));
     weeklyMap.forEach(weekData => {
       const weekStart = new Date(weekData.startDate);
       const weekEnd = new Date(weekData.endDate);
@@ -437,7 +463,7 @@ export default function Campaigns() {
       : '0.0';
 
     // Calculate financial totals from leads, filtered by date if provided
-    let campaignLeads = getAllLeads().filter(l => l.campaign === campaignName);
+    let campaignLeads = getAllLeads().filter(l => leadBelongsToCampaign(l.campaign, campaignName));
     
     if (dateFilter?.from) {
       campaignLeads = campaignLeads.filter(lead => {
@@ -588,7 +614,7 @@ export default function Campaigns() {
   const getCampaignPivotTableData = () => {
     return allCampaigns.map(campaignName => {
       const campaignData = campaignMetrics.filter(m => m.campaignName === campaignName);
-      const campaignLeads = getAllLeads().filter(l => l.campaign === campaignName);
+      const campaignLeads = getAllLeads().filter(l => leadBelongsToCampaign(l.campaign, campaignName));
       const positiveLeads = campaignLeads.filter(l => getLeadResponseType(l) === 'positive');
       const negativeLeads = campaignLeads.filter(l => getLeadResponseType(l) === 'negative');
 
@@ -910,7 +936,7 @@ export default function Campaigns() {
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {selectedCampaigns.map(campaign => {
               const summary = getCampaignSummary(campaign);
-              const leads = getAllLeads().filter(l => l.campaign === campaign);
+              const leads = getAllLeads().filter(l => leadBelongsToCampaign(l.campaign, campaign));
               const proposalsCount = leads.filter(l => l.proposalDate).length;
               const salesCount = leads.filter(l => l.saleDate).length;
               
@@ -1358,7 +1384,7 @@ export default function Campaigns() {
             filename={`campanhas-${granularity}-${format(new Date(), 'yyyy-MM-dd')}`}
             campaignSummaries={selectedCampaigns.map(campaign => {
               const summary = getCampaignSummary(campaign);
-              const leads = getAllLeads().filter(l => l.campaign === campaign);
+              const leads = getAllLeads().filter(l => leadBelongsToCampaign(l.campaign, campaign));
               const proposalsCount = leads.filter(l => l.proposalDate).length;
               const salesCount = leads.filter(l => l.saleDate).length;
               const dailyData = getDailyDataForCampaign(campaign);
