@@ -411,22 +411,30 @@ export default function Campaigns() {
   };
 
   // Helper to get metric total with multiple event type options (PT/EN)
+  // Uses dailyData sum with fallback to totalCount for consistency
   const getMetricValue = (campaignData: any[], eventTypes: string[], dateFilter?: DateRange) => {
     let total = 0;
     for (const eventType of eventTypes) {
       const metric = campaignData.find(m => m.eventType === eventType);
       if (metric) {
+        const dailyData = metric.dailyData || {};
+        const entries = Object.entries(dailyData);
+        
         if (!dateFilter?.from) {
-          total += metric.totalCount || 0;
+          // No date filter: sum all dailyData, fallback to totalCount
+          const dailySum = entries.reduce((sum, [, value]) => sum + (Number(value) || 0), 0);
+          total += dailySum > 0 ? dailySum : (metric.totalCount || 0);
         } else {
-          Object.entries(metric.dailyData || {}).forEach(([dateKey, value]) => {
+          // With date filter: only sum values within range
+          entries.forEach(([dateKey, value]) => {
             try {
+              if (!dateKey || !/^\d{4}-\d{2}-\d{2}$/.test(dateKey)) return;
               const metricDate = parseISO(dateKey);
               const isInRange = dateFilter.to
                 ? isWithinInterval(metricDate, { start: dateFilter.from, end: dateFilter.to })
                 : metricDate >= dateFilter.from;
               if (isInRange) {
-                total += Number(value);
+                total += Number(value) || 0;
               }
             } catch (e) {}
           });
