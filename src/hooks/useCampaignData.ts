@@ -128,25 +128,47 @@ export const useCampaignData = create<CampaignDataStore>((set, get) => ({
       const { data: metricsData, error: metricsError } = await metricsQuery;
       if (metricsError) throw metricsError;
 
-      // Load daily metrics from daily_metrics table
+      // Load daily metrics from daily_metrics table with pagination
       const metricIds = metricsData?.map(m => m.id) || [];
       let dailyMetricsMap: Record<string, Record<string, number>> = {};
 
       if (metricIds.length > 0) {
-        const { data: dailyData, error: dailyError } = await supabase
-          .from('daily_metrics')
-          .select('*')
-          .in('campaign_metric_id', metricIds);
+        // Use pagination to load all daily metrics (bypass 1000 row limit)
+        let allDailyData: any[] = [];
+        let dailyPage = 0;
+        const dailyPageSize = 1000;
+        let hasMoreDaily = true;
 
-        if (!dailyError && dailyData) {
-          // Group daily metrics by campaign_metric_id
-          dailyData.forEach((dm: any) => {
-            if (!dailyMetricsMap[dm.campaign_metric_id]) {
-              dailyMetricsMap[dm.campaign_metric_id] = {};
-            }
-            dailyMetricsMap[dm.campaign_metric_id][dm.date] = Number(dm.value);
-          });
+        while (hasMoreDaily) {
+          const { data: dailyData, error: dailyError } = await supabase
+            .from('daily_metrics')
+            .select('*')
+            .in('campaign_metric_id', metricIds)
+            .range(dailyPage * dailyPageSize, (dailyPage + 1) * dailyPageSize - 1);
+
+          if (dailyError) {
+            console.error('Error loading daily metrics:', dailyError);
+            break;
+          }
+
+          if (dailyData && dailyData.length > 0) {
+            allDailyData = [...allDailyData, ...dailyData];
+            hasMoreDaily = dailyData.length === dailyPageSize;
+            dailyPage++;
+          } else {
+            hasMoreDaily = false;
+          }
         }
+
+        console.log(`📅 Loaded ${allDailyData.length} daily metrics from database`);
+
+        // Group daily metrics by campaign_metric_id
+        allDailyData.forEach((dm: any) => {
+          if (!dailyMetricsMap[dm.campaign_metric_id]) {
+            dailyMetricsMap[dm.campaign_metric_id] = {};
+          }
+          dailyMetricsMap[dm.campaign_metric_id][dm.date] = Number(dm.value);
+        });
       }
       
       // Load leads with pagination to bypass the 1000 row limit
