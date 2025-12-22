@@ -2,10 +2,11 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Upload, Trash2, Download, FileText, Play } from 'lucide-react';
+import { Upload, Trash2, Download, FileText, Play, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { Input } from '@/components/ui/input';
+import { Progress } from '@/components/ui/progress';
 import { parseCampaignCsv } from '@/utils/campaignCsvParser';
 import { parseLeadsCsv } from '@/utils/leadsCsvParser';
 import { parseHybridCsv } from '@/utils/hybridCsvParser';
@@ -17,6 +18,19 @@ import { DeleteDataSection } from '@/components/DeleteDataSection';
 import { ProfileCrud } from '@/components/ProfileCrud';
 import { PMConfiguration } from '@/components/PMConfiguration';
 import { CsvFormatPreview } from '@/components/CsvFormatPreview';
+
+interface ProcessingProgress {
+  currentFile: number;
+  totalFiles: number;
+  currentFileName: string;
+  currentStep: string;
+  processedItems: {
+    profiles: number;
+    campaigns: number;
+    metrics: number;
+    leads: number;
+  };
+}
 
 type FileUpload = {
   id: string;
@@ -34,6 +48,7 @@ export default function UserSettings() {
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [processing, setProcessing] = useState(false);
+  const [progress, setProgress] = useState<ProcessingProgress | null>(null);
   const [showPreview, setShowPreview] = useState(false);
   const [previewData, setPreviewData] = useState<FilePreviewData[]>([]);
   const [parsedFilesData, setParsedFilesData] = useState<any[]>([]);
@@ -514,6 +529,14 @@ export default function UserSettings() {
     console.log('Modo incremental:', incrementalMode);
     
     setProcessing(true);
+    setProgress({
+      currentFile: 0,
+      totalFiles: parsedFilesData.length,
+      currentFileName: '',
+      currentStep: 'Iniciando...',
+      processedItems: { profiles: 0, campaigns: 0, metrics: 0, leads: 0 }
+    });
+    
     let totalMetrics = 0;
     let totalProfiles = 0;
     let totalCampaigns = 0;
@@ -527,6 +550,7 @@ export default function UserSettings() {
 
       // Only clear data if NOT in incremental mode
       if (!incrementalMode) {
+        setProgress(prev => prev ? { ...prev, currentStep: 'Limpando dados anteriores...' } : null);
         console.log('🗑️ Limpando dados existentes do usuário:', user.id);
         
         // Delete daily_metrics first (foreign key dependency)
@@ -544,8 +568,19 @@ export default function UserSettings() {
 
       // Process each file based on type
       let totalLeads = 0;
+      let fileIndex = 0;
       
-      for (const { parsedData, type } of parsedFilesData) {
+      for (const { parsedData, type, fileRecord, campaignName: fileCampaignName } of parsedFilesData) {
+        fileIndex++;
+        const fileName = fileRecord?.file_name || `Arquivo ${fileIndex}`;
+        
+        setProgress(prev => prev ? {
+          ...prev,
+          currentFile: fileIndex,
+          currentFileName: fileName,
+          currentStep: `Processando arquivo ${fileIndex}/${parsedFilesData.length}...`
+        } : null);
+        
         if (type === 'campaign-input') {
           // Filter parsed data based on selected profiles
           const filteredData = parsedData.filter((data: any) => {
@@ -575,6 +610,11 @@ export default function UserSettings() {
             }
 
             totalProfiles++;
+            setProgress(prev => prev ? {
+              ...prev,
+              currentStep: `Processando perfil: ${data.profileName}`,
+              processedItems: { ...prev.processedItems, profiles: totalProfiles }
+            } : null);
             console.log(`✅ Profile: ${data.profileName}`);
 
             // Create campaign (upsert to avoid duplicate key errors)
@@ -598,6 +638,11 @@ export default function UserSettings() {
             }
 
             totalCampaigns++;
+            setProgress(prev => prev ? {
+              ...prev,
+              currentStep: `Processando campanha: ${data.campaignName}`,
+              processedItems: { ...prev.processedItems, campaigns: totalCampaigns }
+            } : null);
             console.log(`✅ Campaign: ${data.campaignName}`);
 
             // Insert metrics (upsert to avoid duplicate key errors)
@@ -623,6 +668,11 @@ export default function UserSettings() {
                 console.error(`❌ Error upserting metric ${metric.eventType}:`, metricError);
               } else {
                 totalMetrics++;
+                setProgress(prev => prev ? {
+                  ...prev,
+                  currentStep: `Processando métrica: ${metric.eventType}`,
+                  processedItems: { ...prev.processedItems, metrics: totalMetrics }
+                } : null);
                 console.log(`✅ Metric: ${metric.eventType}`);
 
                 // Upsert daily data into daily_metrics table
@@ -720,8 +770,13 @@ export default function UserSettings() {
             if (leadsError) {
               console.error('❌ Error inserting positive leads:', leadsError);
             } else {
-              totalLeads += leadsToInsert.length;
-              console.log(`✅ ${leadsToInsert.length} positive leads inserted`);
+              totalLeads += deduplicatedLeads.length;
+              setProgress(prev => prev ? {
+                ...prev,
+                currentStep: `Importando ${deduplicatedLeads.length} leads positivos...`,
+                processedItems: { ...prev.processedItems, leads: totalLeads }
+              } : null);
+              console.log(`✅ ${deduplicatedLeads.length} positive leads inserted`);
             }
           }
           
@@ -765,8 +820,13 @@ export default function UserSettings() {
             if (leadsError) {
               console.error('❌ Error inserting negative leads:', leadsError);
             } else {
-              totalLeads += leadsToInsert.length;
-              console.log(`✅ ${leadsToInsert.length} negative leads inserted`);
+              totalLeads += deduplicatedLeads.length;
+              setProgress(prev => prev ? {
+                ...prev,
+                currentStep: `Importando ${deduplicatedLeads.length} leads negativos...`,
+                processedItems: { ...prev.processedItems, leads: totalLeads }
+              } : null);
+              console.log(`✅ ${deduplicatedLeads.length} negative leads inserted`);
             }
           }
         } else if (type === 'hybrid') {
@@ -935,6 +995,11 @@ export default function UserSettings() {
               console.error('❌ Error inserting hybrid leads:', leadsError);
             } else {
               totalLeads += deduplicatedLeads.length;
+              setProgress(prev => prev ? {
+                ...prev,
+                currentStep: `Importando ${deduplicatedLeads.length} leads...`,
+                processedItems: { ...prev.processedItems, leads: totalLeads }
+              } : null);
               console.log(`✅ ${deduplicatedLeads.length} hybrid leads inserted`);
             }
           }
@@ -964,6 +1029,7 @@ export default function UserSettings() {
       toast.error(error.message || 'Erro ao importar dados');
     } finally {
       setProcessing(false);
+      setProgress(null);
     }
   };
 
@@ -1021,6 +1087,49 @@ export default function UserSettings() {
                 </Button>
               )}
             </div>
+
+            {/* Progress indicator during processing */}
+            {processing && progress && (
+              <Card className="border-primary/50 bg-primary/5">
+                <CardContent className="py-4">
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-3">
+                      <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                      <div className="flex-1">
+                        <p className="font-medium text-sm">{progress.currentStep}</p>
+                        <p className="text-xs text-muted-foreground">
+                          Arquivo {progress.currentFile} de {progress.totalFiles}: {progress.currentFileName}
+                        </p>
+                      </div>
+                    </div>
+                    
+                    <Progress 
+                      value={(progress.currentFile / progress.totalFiles) * 100} 
+                      className="h-2"
+                    />
+                    
+                    <div className="grid grid-cols-4 gap-2 text-center text-xs">
+                      <div className="bg-background rounded p-2">
+                        <p className="font-bold text-primary">{progress.processedItems.profiles}</p>
+                        <p className="text-muted-foreground">Perfis</p>
+                      </div>
+                      <div className="bg-background rounded p-2">
+                        <p className="font-bold text-primary">{progress.processedItems.campaigns}</p>
+                        <p className="text-muted-foreground">Campanhas</p>
+                      </div>
+                      <div className="bg-background rounded p-2">
+                        <p className="font-bold text-primary">{progress.processedItems.metrics}</p>
+                        <p className="text-muted-foreground">Métricas</p>
+                      </div>
+                      <div className="bg-background rounded p-2">
+                        <p className="font-bold text-primary">{progress.processedItems.leads}</p>
+                        <p className="text-muted-foreground">Leads</p>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
 
             {loading ? (
               <div className="text-center py-8 text-muted-foreground">
